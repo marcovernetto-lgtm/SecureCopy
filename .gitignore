@@ -1,0 +1,27 @@
+# Node.js dependencies
+node_modules/
+
+# Production builds & binary installers (large binaries, not kept in git history)
+dist/
+build/
+graphify-out/
+
+# Operating System files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+
+# Environment and sensitive keys
+.env
+.env.local
+*.pem
+*.key
+*.cert
+
+# Temporary test profiles and caches
+test-profile*/
+.impeccable/
+*.tmp

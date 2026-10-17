@@ -1,0 +1,11 @@
+{
+  "syntheticRows": 500000,
+  "initialMs": 167.19999998807907,
+  "searchMs": 147.80000001192093,
+  "rows": 300,
+  "matchedRows": [
+    "DCIM/clip-0499999.BRAW"
+  ],
+  "selected": 300,
+  "heapMiB": 73.05145263671875
+}

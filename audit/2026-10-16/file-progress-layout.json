@@ -1,0 +1,105 @@
+{
+  "samples": [
+    {
+      "index": 0,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    },
+    {
+      "index": 1,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    },
+    {
+      "index": 2,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "10%"
+    },
+    {
+      "index": 3,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    },
+    {
+      "index": 4,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    },
+    {
+      "index": 5,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "50%"
+    },
+    {
+      "index": 6,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "100%"
+    },
+    {
+      "index": 7,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    },
+    {
+      "index": 8,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "50%"
+    },
+    {
+      "index": 9,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    },
+    {
+      "index": 10,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    },
+    {
+      "index": 11,
+      "panelHeight": 94,
+      "trackHeight": 5,
+      "trackTop": 389,
+      "cardHeight": 233,
+      "bar": "0%"
+    }
+  ],
+  "finished": {
+    "panelHeight": 94,
+    "trackHeight": 5,
+    "bar": "0%"
+  }
+}

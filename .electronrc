@@ -1,0 +1,18 @@
+# Electron Configuration for SecureCopy
+{
+  "enable-logging": true,
+  "log-level": "info",
+  "disable-gpu": false,
+  "disable-software-rasterizer": false,
+  "disable-dev-shm-usage": true,
+  "no-sandbox": false,
+  "disable-setuid-sandbox": false,
+  "disable-web-security": false,
+  "allow-running-insecure-content": false,
+  "disable-features": "VizDisplayCompositor",
+  "enable-features": "VaapiVideoDecoder",
+  "max-old-space-size": 4096,
+  "v8-cache-options": "code",
+  "js-flags": "--max-old-space-size=4096"
+}
+

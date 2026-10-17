@@ -1,0 +1,25 @@
+{
+  "files": 90,
+  "opaqueExtensions": 27,
+  "boundarySizes": [
+    0,
+    1,
+    63,
+    64,
+    65,
+    65535,
+    65536,
+    65537,
+    1048575,
+    1048576,
+    1048577
+  ],
+  "unicodeAndNewlineAndShellCharacters": true,
+  "nameBytes": 249,
+  "depth": 40,
+  "hiddenExcluded": true,
+  "identicalSkippedWithoutRewriting": true,
+  "allSha256AndCreationDates": true,
+  "seconds": 3.96118375,
+  "peakRssMiB": 103.375
+}

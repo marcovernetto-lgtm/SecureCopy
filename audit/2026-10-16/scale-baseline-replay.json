@@ -1,0 +1,11 @@
+{
+  "seconds": 21.302976375,
+  "peakRssMiB": 1266.9375,
+  "eventLoopMaxMs": 183.894015,
+  "rows": 202000,
+  "summary": {
+    "identical": 201998,
+    "different": 1,
+    "missing": 1
+  }
+}

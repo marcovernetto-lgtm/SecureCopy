@@ -1,0 +1,17 @@
+{
+  "rows": 202000,
+  "summary": {
+    "identical": 201998,
+    "different": 1,
+    "missing": 1
+  },
+  "rendered": 2,
+  "error": "202000 elementi analizzati.",
+  "report": "/private/var/folders/f5/c0nwwty94nxgby_2_66nrj7m0000gn/T/securecopy-stress-app-scale-KB3CLE/profile/reports/SecureCopy-confronto-a6d7f8f2-1c33-4b87-b31e-ee1c20108f7e.json",
+  "heapMiB": 168.80035400390625,
+  "reportParsedRows": 202000,
+  "seconds": 30.699,
+  "peakMainRssMiB": 863.984375,
+  "maxPingMs": 585,
+  "reportMiB": 137.88156986236572
+}

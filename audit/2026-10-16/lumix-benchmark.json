@@ -1,0 +1,24 @@
+{
+  "source": "/Volumes/ExternalDrive/DAY_01/Lumix",
+  "root": "~/Desktop/Test copia Lumix 2026-10-16 - s1BDIw",
+  "files": 129,
+  "bytes": 53060780686,
+  "version": "2.7.6",
+  "order": [
+    "Finder",
+    "SecureCopy"
+  ],
+  "cacheNotFlushed": true,
+  "startedAt": "2026-10-16T00:43:37.863Z",
+  "finderSeconds": 131.40967770900002,
+  "profile": "/private/var/folders/f5/c0nwwty94nxgby_2_66nrj7m0000gn/T/securecopy-lumix-profile-D406sM",
+  "secureCopySeconds": 285.098986666,
+  "ratio": 2.169543306371522,
+  "extraPercent": 116.9543306371522,
+  "status": "completed",
+  "copied": 129,
+  "failures": [],
+  "finderHashesVerified": 129,
+  "sourceUnchanged": true,
+  "completedAt": "2026-10-16T00:51:08.593Z"
+}

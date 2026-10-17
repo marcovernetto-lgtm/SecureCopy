@@ -1,0 +1,20 @@
+{
+  "root": "/private/var/folders/f5/c0nwwty94nxgby_2_66nrj7m0000gn/T/securecopy-stress-scale-SYiB4R",
+  "filesPerSide": 200000,
+  "physicalFileEntries": 399999,
+  "resultRows": 202000,
+  "fixtureSeconds": 136.98074483399998,
+  "seconds": 21.369121000000014,
+  "entriesPerSecond": 18718.598673291228,
+  "peakRssMiB": 1168.265625,
+  "eventLoopMaxMs": 162.922495,
+  "progressEvents": 288,
+  "payloadMiB": 98.50816059112549,
+  "serializeMs": 202.65545800002292,
+  "summary": {
+    "identical": 201998,
+    "different": 1,
+    "missing": 1
+  },
+  "fixtureUsesHardLinks": true
+}

@@ -1,0 +1,72 @@
+{
+  "longFilename": {
+    "length": 224,
+    "status": "partial",
+    "failures": [
+      "Command failed: ditto /private/var/folders/f5/c0nwwty94nxgby_2_66nrj7m0000gn/T/securecopy-audit-fixtures-uCqVkt/long/SD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.MOV /private/var/folders/f5/c0nwwty94nxgby_2_66nrj7m0000gn/T/securecopy-audit-fixtures-uCqVkt/long/dest/SD/.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.MOV.securecopy-8dac6a1d-ee39-4007-b8e2-00ced065996e.part\nditto: /private/var/folders/f5/c0nwwty94nxgby_2_66nrj7m0000gn/T/securecopy-audit-fixtures-uCqVkt/long/dest/SD/.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.MOV.securecopy-8dac6a1d-ee39-4007-b8e2-00ced065996e.part: File name too long\n"
+    ]
+  },
+  "missingRetry": {
+    "status": "completed",
+    "files": 0,
+    "failures": [],
+    "unrelatedDirectoryCreated": true
+  },
+  "folderButton": {
+    "status": "completed",
+    "destinationFiles": [],
+    "entries": [
+      {
+        "path": "DAY1",
+        "status": "identical",
+        "created": true
+      },
+      {
+        "path": "DAY1/clip.mov",
+        "status": "missing",
+        "created": false
+      }
+    ]
+  },
+  "progress": {
+    "status": "completed",
+    "events": [
+      {
+        "phase": "compare",
+        "processed": 0,
+        "percentage": 0
+      },
+      {
+        "phase": "copy",
+        "processed": 0,
+        "percentage": 0
+      },
+      {
+        "phase": "copy",
+        "processed": 0,
+        "percentage": 100
+      },
+      {
+        "phase": "verify",
+        "processed": 0,
+        "percentage": 0
+      },
+      {
+        "phase": "copy",
+        "processed": 1,
+        "percentage": 100
+      }
+    ]
+  },
+  "specialPermissions": {
+    "sourceMode": "755",
+    "status": "completed",
+    "failures": []
+  },
+  "skip": {
+    "status": "completed",
+    "copied": 0,
+    "kept": 1,
+    "verified": 0
+  }
+}

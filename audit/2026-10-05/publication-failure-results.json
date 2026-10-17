@@ -1,0 +1,11 @@
+{
+  "status": "partial",
+  "failures": [
+    {
+      "path": "/private/var/folders/f5/c0nwwty94nxgby_2_66nrj7m0000gn/T/securecopy-publication-audit-Ud9bCG/SD/clip.mov",
+      "reason": "simulated disk-full during final publication"
+    }
+  ],
+  "visibleDestination": "XX",
+  "previousVersion": "old valid media content"
+}

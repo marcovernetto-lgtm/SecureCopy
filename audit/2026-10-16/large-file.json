@@ -1,0 +1,10 @@
+{
+  "bytes": 4295032833,
+  "over4GiB": true,
+  "sourceSparseWithRandomMarkers": true,
+  "fullStreamCopiedAndHashed": true,
+  "seconds": 12.368989667,
+  "peakRssMiB": 178.765625,
+  "progressEvents": 196621,
+  "monotonicBelow100": true
+}

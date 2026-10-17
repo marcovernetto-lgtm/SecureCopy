@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="68" y1="48" x2="905" y2="998" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#23566d"/>
+      <stop offset=".46" stop-color="#123443"/>
+      <stop offset="1" stop-color="#0c1d29"/>
+    </linearGradient>
+    <linearGradient id="folder-back" x1="213" y1="336" x2="783" y2="764" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5898bd"/>
+      <stop offset="1" stop-color="#256584"/>
+    </linearGradient>
+    <linearGradient id="folder-front" x1="276" y1="450" x2="715" y2="806" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a8d9ee"/>
+      <stop offset="1" stop-color="#5fa7ca"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="380" y1="205" x2="634" y2="618" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fcfd"/>
+      <stop offset="1" stop-color="#d8eef6"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="681" y1="534" x2="812" y2="768" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#91d9ba"/>
+      <stop offset="1" stop-color="#37a78b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- A nearly full-size macOS tile; only the outer rounded corners are transparent. -->
+  <rect x="16" y="16" width="992" height="992" rx="226" fill="url(#tile)"/>
+  <rect x="18" y="18" width="988" height="988" rx="224" fill="none" stroke="#9fd2e6" stroke-opacity=".28" stroke-width="4"/>
+  <path d="M76 365C110 173 264 62 480 56" fill="none" stroke="#a4d9e9" stroke-opacity=".12" stroke-width="28" stroke-linecap="round"/>
+  <ellipse cx="511" cy="802" rx="317" ry="40" fill="#071720" opacity=".24"/>
+
+  <!-- The paper and the folder stay visually separate at Dock sizes. -->
+  <path d="M311 277c0-24 18-43 42-43h181l108 108v246H311Z" fill="#071e2b" opacity=".16" transform="translate(13 20)"/>
+  <path d="M307 264c0-22 18-40 40-40h186l103 105v278H307Z" fill="url(#paper)"/>
+  <path d="M533 224v77c0 16 12 28 28 28h75Z" fill="#b7d8e8"/>
+  <path d="M533 224v76c0 17 13 29 29 29h73" fill="none" stroke="#91bbcf" stroke-width="5"/>
+  <path d="M370 382h199M370 422h171M370 462h116" fill="none" stroke="#88afc1" stroke-opacity=".7" stroke-width="13" stroke-linecap="round"/>
+
+  <path d="M216 395c0-27 22-49 49-49h177l47 48h267c27 0 49 22 49 49v277c0 33-26 59-59 59H275c-33 0-59-26-59-59Z" fill="url(#folder-back)"/>
+  <path d="M224 416h571" fill="none" stroke="#c5e8f5" stroke-opacity=".46" stroke-width="7"/>
+  <path d="M219 477c-4-27 17-48 44-48h491c28 0 48 21 44 48l-34 272c-4 29-28 49-57 49H307c-29 0-53-20-57-49Z" fill="url(#folder-front)"/>
+  <path d="M267 447h479" fill="none" stroke="#e3f5fa" stroke-opacity=".55" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Verification mark is large enough to read at 32 pixels. -->
+  <path d="m714 515 115 41v100c0 80-56 141-115 173-60-32-115-93-115-173V556Z" fill="#103f3c" opacity=".33" transform="translate(8 12)"/>
+  <path d="m714 515 115 41v100c0 80-56 141-115 173-60-32-115-93-115-173V556Z" fill="url(#shield)" stroke="#d1f5e7" stroke-opacity=".7" stroke-width="7"/>
+  <path d="m658 668 40 41 75-85" fill="none" stroke="#f5fffa" stroke-width="29" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

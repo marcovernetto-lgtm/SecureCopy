@@ -1,6 +1,23 @@
 # SecureCopy 2.7.7
+by **Unshaped Studio**
 
-SecureCopy copia cartelle localmente e confronta il checksum SHA-256 di **ogni file** con quello della sorgente. I file già identici vengono saltati. I file saltati per scelta non sono dichiarati verificati. Ogni operazione produce un report JSON con gli hash dei file verificati, l'esito e gli eventuali errori. La coda delle operazioni in attesa viene conservata fra le sessioni.
+> Copia sicura, offloading e confronto cartelle per macOS con verifica di integrità SHA-256 byte per byte.
+
+---
+
+### ⬇️ Download per macOS (v2.7.7)
+
+Scarica il pacchetto per il tuo Mac:
+
+- 🍏 **[Download per Mac con Apple Silicon (M1 / M2 / M3 / M4)](https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.7.7/SecureCopy-2.7.7-arm64.dmg)** (`.dmg`)
+- 💻 **[Download per Mac Intel](https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.7.7/SecureCopy-2.7.7-x64.dmg)** (`.dmg`)
+
+*(Requisito: macOS 13 Ventura o successivo)*
+
+---
+
+### ⚡ Cos'è SecureCopy
+SecureCopy copia cartelle localmente e verifica l'impronta SHA-256 di **ogni singolo file** con quello della sorgente. Mantiene le date di creazione originali, i metadati e gestisce copie bidirezionali e riprese sicure.
 
 ## Copia e metadati
 

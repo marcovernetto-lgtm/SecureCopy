@@ -251,7 +251,11 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 .settings-select { background: rgba(18,32,38,.85); color: #eaf3f5; border: 1px solid rgba(94,234,212,.25); border-radius: 7px; padding: 5px 9px; font-size: 11.5px; font-weight: 500; min-width: 105px; cursor: pointer; }
 .settings-row .compact-btn { min-height: 28px; padding: 4px 11px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .settings-inline-status { font-size: 11px; color: #5eead4; padding: 4px 14px 8px; margin: 0; line-height: 1.4; }
-.settings-subgroup { padding: 10px 14px 12px; background: rgba(0,0,0,.22); border-top: 1px solid rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 8px; }
+.settings-subgroup { padding: 10px 14px 12px; background: rgba(0,0,0,.22); border-top: 1px solid rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 8px; transition: padding 0.18s ease, gap 0.18s ease; }
+#telegram-config-panel.is-configured { padding: 7px 14px 9px; gap: 6px; background: rgba(0,0,0,.16); }
+#telegram-config-panel.is-configured .telegram-inputs-grid { gap: 10px; }
+#telegram-config-panel.is-configured .settings-input-text { padding: 5px 9px; font-size: 11px; }
+#telegram-config-panel.is-configured .telegram-panel-footer { min-height: 26px; }
 .telegram-guide-box { background: rgba(94,234,212,.04); border: 1px solid rgba(94,234,212,.16); border-radius: 9px; padding: 8px 11px; margin-bottom: 2px; }
 .telegram-guide-header { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #5eead4; margin-bottom: 5px; }
 .telegram-guide-header strong { font-weight: 600; letter-spacing: .2px; }
@@ -267,11 +271,16 @@ input[type='checkbox'] { accent-color: var(--section-light); }
   .telegram-inputs-grid { grid-template-columns: 1fr; }
 }
 .telegram-panel-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 2px; min-height: 30px; }
+.telegram-footer-left { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.telegram-guide-toggle-btn { background: none; border: none; padding: 0; font-size: 10.5px; font-weight: 500; color: #5eead4; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; white-space: nowrap; opacity: 0.75; transition: opacity 0.15s, color 0.15s; }
+.telegram-guide-toggle-btn:hover { opacity: 1; color: #ffffff; }
 .telegram-panel-footer .settings-inline-status { padding: 0; margin: 0; }
 .settings-input-row { display: flex; flex-direction: column; gap: 3px; }
 .settings-input-label { font-size: 10.5px; font-weight: 600; color: #8fa7b0; text-transform: uppercase; letter-spacing: .5px; }
 .settings-input-text { background: rgba(18,32,38,.85); color: #eaf3f5; border: 1px solid rgba(94,234,212,.22); border-radius: 7px; padding: 6px 9px; font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; outline: none; transition: border-color .15s, box-shadow .15s; }
 .settings-input-text:focus { border-color: #5eead4; box-shadow: 0 0 0 2px rgba(94,234,212,.15); }
+.settings-input-text.input-invalid { border-color: #ef7766 !important; background: rgba(239, 119, 102, 0.08) !important; }
+.settings-input-text.input-invalid:focus { border-color: #ef7766 !important; box-shadow: 0 0 0 2px rgba(239, 119, 102, 0.2) !important; }
 .settings-input-actions { display: flex; gap: 8px; }
 .settings-input-actions .settings-input-text { flex: 1; min-width: 0; }
 .settings-row-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }

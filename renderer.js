@@ -2134,11 +2134,63 @@ const soundAlertsToggle = document.getElementById('sound-alerts');
 const autoEjectToggle = document.getElementById('auto-eject');
 const telegramEnabledToggle = document.getElementById('telegram-enabled');
 const telegramConfigPanel = document.getElementById('telegram-config-panel');
+const telegramGuideBox = document.getElementById('telegram-guide-box');
+const telegramToggleGuideBtn = document.getElementById('telegram-toggle-guide-btn');
+const telegramStatusBadge = document.getElementById('telegram-status-badge');
 const telegramBotTokenInput = document.getElementById('telegram-bot-token');
 const telegramChatIdInput = document.getElementById('telegram-chat-id');
 const telegramDetectBtn = document.getElementById('telegram-detect-btn');
 const telegramTestBtn = document.getElementById('telegram-test-btn');
 const telegramStatusMsg = document.getElementById('telegram-status-msg');
+
+let isTokenApiInvalid = false;
+let userToggledGuide = false;
+
+function isTelegramBotTokenValid(token) {
+    if (!token || typeof token !== 'string') return false;
+    const trimmed = token.trim();
+    if (!trimmed) return false;
+    return /^\d{5,16}:[A-Za-z0-9_-]{20,60}$/.test(trimmed);
+}
+
+function updateTelegramTutorialVisibility() {
+    const token = telegramBotTokenInput?.value?.trim() || '';
+    const isTokenEmpty = !token;
+    const isTokenFormatValid = !isTokenEmpty && isTelegramBotTokenValid(token);
+    const isTokenIncorrect = !isTokenEmpty && (!isTokenFormatValid || isTokenApiInvalid);
+    const isConfiguredCorrectly = isTokenFormatValid && !isTokenApiInvalid;
+
+    const showGuide = (!isConfiguredCorrectly) || userToggledGuide;
+
+    if (telegramGuideBox) {
+        telegramGuideBox.style.display = showGuide ? 'block' : 'none';
+    }
+
+    if (telegramConfigPanel) {
+        telegramConfigPanel.classList.toggle('is-configured', isConfiguredCorrectly && !userToggledGuide);
+    }
+
+    if (telegramBotTokenInput) {
+        telegramBotTokenInput.classList.toggle('input-invalid', isTokenIncorrect);
+    }
+
+    if (telegramToggleGuideBtn) {
+        telegramToggleGuideBtn.style.display = isConfiguredCorrectly ? 'inline-block' : 'none';
+        telegramToggleGuideBtn.textContent = userToggledGuide ? 'Nascondi guida' : 'Mostra guida';
+    }
+
+    if (telegramStatusBadge) {
+        const isEnabled = !!telegramEnabledToggle?.checked;
+        telegramStatusBadge.style.display = (isEnabled && isConfiguredCorrectly) ? 'inline-block' : 'none';
+    }
+}
+
+if (telegramToggleGuideBtn) {
+    telegramToggleGuideBtn.addEventListener('click', () => {
+        userToggledGuide = !userToggledGuide;
+        updateTelegramTutorialVisibility();
+    });
+}
 
 async function renderMediaSettings(settings) {
     if (!settings) return;
@@ -2157,6 +2209,7 @@ async function renderMediaSettings(settings) {
     if (telegramChatIdInput && typeof settings.telegramChatId === 'string') {
         telegramChatIdInput.value = settings.telegramChatId;
     }
+    updateTelegramTutorialVisibility();
 }
 
 window.electronAPI?.getMediaSettings?.().then(renderMediaSettings).catch(console.error);
@@ -2197,12 +2250,14 @@ if (telegramEnabledToggle) {
             if (telegramConfigPanel) {
                 telegramConfigPanel.style.display = telegramEnabledToggle.checked ? 'flex' : 'none';
             }
+            updateTelegramTutorialVisibility();
             await window.electronAPI?.setMediaSettings?.({ telegramEnabled: telegramEnabledToggle.checked });
         } catch (error) {
             telegramEnabledToggle.checked = !telegramEnabledToggle.checked;
             if (telegramConfigPanel) {
                 telegramConfigPanel.style.display = telegramEnabledToggle.checked ? 'flex' : 'none';
             }
+            updateTelegramTutorialVisibility();
             showError(error.message);
         }
     });
@@ -2217,8 +2272,15 @@ function saveTelegramCredentials() {
     }).catch(console.error);
 }
 
+telegramBotTokenInput?.addEventListener('input', () => {
+    isTokenApiInvalid = false;
+    userToggledGuide = false;
+    updateTelegramTutorialVisibility();
+    saveTelegramCredentials();
+});
 telegramBotTokenInput?.addEventListener('change', saveTelegramCredentials);
 telegramBotTokenInput?.addEventListener('blur', saveTelegramCredentials);
+telegramChatIdInput?.addEventListener('input', saveTelegramCredentials);
 telegramChatIdInput?.addEventListener('change', saveTelegramCredentials);
 telegramChatIdInput?.addEventListener('blur', saveTelegramCredentials);
 
@@ -2226,9 +2288,21 @@ if (telegramDetectBtn) {
     telegramDetectBtn.addEventListener('click', async () => {
         const token = telegramBotTokenInput?.value?.trim();
         if (!token) {
+            isTokenApiInvalid = false;
+            updateTelegramTutorialVisibility();
             if (telegramStatusMsg) {
                 telegramStatusMsg.hidden = false;
                 telegramStatusMsg.textContent = 'Inserisci prima il Bot Token.';
+            }
+            telegramBotTokenInput?.focus();
+            return;
+        }
+        if (!isTelegramBotTokenValid(token)) {
+            isTokenApiInvalid = true;
+            updateTelegramTutorialVisibility();
+            if (telegramStatusMsg) {
+                telegramStatusMsg.hidden = false;
+                telegramStatusMsg.textContent = '⚠️ Formato Bot Token non valido. Controlla la guida.';
             }
             telegramBotTokenInput?.focus();
             return;
@@ -2241,6 +2315,8 @@ if (telegramDetectBtn) {
         try {
             const res = await window.electronAPI?.detectTelegramChatId?.(token);
             if (res && res.ok && res.chatId) {
+                isTokenApiInvalid = false;
+                updateTelegramTutorialVisibility();
                 if (telegramChatIdInput) telegramChatIdInput.value = res.chatId;
                 await window.electronAPI?.setMediaSettings?.({
                     telegramBotToken: token,
@@ -2251,6 +2327,10 @@ if (telegramDetectBtn) {
                     telegramStatusMsg.textContent = `✅ Chat trovata: ${res.title} (ID: ${res.chatId})`;
                 }
             } else {
+                if (res?.statusCode === 401 || /unauthorized|token/i.test(res?.error || '')) {
+                    isTokenApiInvalid = true;
+                    updateTelegramTutorialVisibility();
+                }
                 if (telegramStatusMsg) {
                     telegramStatusMsg.hidden = false;
                     telegramStatusMsg.textContent = `⚠️ ${res?.error || 'Nessun messaggio trovato'}`;
@@ -2272,9 +2352,19 @@ if (telegramTestBtn) {
         const token = telegramBotTokenInput?.value?.trim();
         const chatId = telegramChatIdInput?.value?.trim();
         if (!token || !chatId) {
+            if (!token) updateTelegramTutorialVisibility();
             if (telegramStatusMsg) {
                 telegramStatusMsg.hidden = false;
                 telegramStatusMsg.textContent = 'Inserisci sia il Bot Token sia il Chat ID.';
+            }
+            return;
+        }
+        if (!isTelegramBotTokenValid(token)) {
+            isTokenApiInvalid = true;
+            updateTelegramTutorialVisibility();
+            if (telegramStatusMsg) {
+                telegramStatusMsg.hidden = false;
+                telegramStatusMsg.textContent = '⚠️ Formato Bot Token non valido. Controlla la guida.';
             }
             return;
         }
@@ -2290,11 +2380,17 @@ if (telegramTestBtn) {
             });
             const res = await window.electronAPI?.testTelegramNotification?.(token, chatId);
             if (res && res.ok) {
+                isTokenApiInvalid = false;
+                updateTelegramTutorialVisibility();
                 if (telegramStatusMsg) {
                     telegramStatusMsg.hidden = false;
                     telegramStatusMsg.textContent = '✅ Notifica inviata con successo! Controlla Telegram.';
                 }
             } else {
+                if (res?.statusCode === 401 || /unauthorized|token/i.test(res?.error || '')) {
+                    isTokenApiInvalid = true;
+                    updateTelegramTutorialVisibility();
+                }
                 if (telegramStatusMsg) {
                     telegramStatusMsg.hidden = false;
                     telegramStatusMsg.textContent = `⚠️ ${res?.error || 'Errore invio'}`;

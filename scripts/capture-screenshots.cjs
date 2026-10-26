@@ -244,6 +244,13 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         tgToggle.checked = true;
         const panel = document.getElementById('telegram-config-panel');
         if (panel) panel.style.display = 'flex';
+        const tokenInput = document.getElementById('telegram-bot-token');
+        if (tokenInput) tokenInput.value = '718429182:AAHq_1234567890abcdefghijklmnopqrstuvw';
+        const chatInput = document.getElementById('telegram-chat-id');
+        if (chatInput) chatInput.value = '842877845';
+        if (typeof updateTelegramTutorialVisibility === 'function') {
+          updateTelegramTutorialVisibility();
+        }
       }
     })()`);
     await delay(500);

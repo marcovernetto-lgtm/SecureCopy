@@ -252,6 +252,12 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       const box = document.getElementById('credits-box');
       box.style.display = 'flex';
       box.classList.remove('hidden');
+      const tgToggle = document.getElementById('telegram-enabled');
+      if (tgToggle) {
+        tgToggle.checked = true;
+        const panel = document.getElementById('telegram-config-panel');
+        if (panel) panel.style.display = 'flex';
+      }
     })()`);
     await delay(500);
     snap = await command('Page.captureScreenshot', { format: 'png' });

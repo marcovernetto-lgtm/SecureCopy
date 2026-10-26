@@ -229,6 +229,16 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 .settings-row .compact-btn { min-height: 30px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
 .settings-inline-status { font-size: 11px; color: #5eead4; padding: 6px 14px 10px; margin: 0; line-height: 1.4; }
 .settings-subgroup { padding: 12px 14px; background: rgba(0,0,0,.22); border-top: 1px solid rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 10px; }
+.telegram-guide-box { background: rgba(94,234,212,.04); border: 1px solid rgba(94,234,212,.16); border-radius: 9px; padding: 10px 12px; margin-bottom: 2px; }
+.telegram-guide-header { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #5eead4; margin-bottom: 8px; }
+.telegram-guide-header strong { font-weight: 600; letter-spacing: .2px; }
+.telegram-guide-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.telegram-guide-steps li { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; line-height: 1.45; color: #c0d3d8; }
+.telegram-guide-steps .guide-num { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(94,234,212,.18); color: #5eead4; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.telegram-guide-steps code { background: rgba(0,0,0,.4); border: 1px solid rgba(94,234,212,.22); padding: 1px 4px; border-radius: 4px; font-size: 10.5px; color: #5eead4; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; }
+.telegram-guide-steps .guide-link { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+.telegram-guide-steps .guide-link:hover { color: #ffffff; }
+.telegram-guide-steps b, .telegram-guide-steps strong { color: #edf5f7; font-weight: 600; }
 .settings-input-row { display: flex; flex-direction: column; gap: 4px; }
 .settings-input-label { font-size: 11px; font-weight: 600; color: #8fa7b0; text-transform: uppercase; letter-spacing: .5px; }
 .settings-input-text { background: rgba(18,32,38,.85); color: #eaf3f5; border: 1px solid rgba(94,234,212,.22); border-radius: 8px; padding: 7px 10px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; outline: none; transition: border-color .15s, box-shadow .15s; }

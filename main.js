@@ -213,13 +213,15 @@ function createWindow(background = false) {
   const allowedExternal = new Set([
     'https://buymeacoffee.com/vemarcus',
     'https://github.com/marcovernetto-lgtm/SecureCopy',
-    'https://github.com/marcovernetto-lgtm/SecureCopy/releases'
+    'https://github.com/marcovernetto-lgtm/SecureCopy/releases',
+    'https://t.me/BotFather'
   ]);
   const openApprovedExternal = url => {
     try {
       const parsed = new URL(url);
       if (parsed.protocol === 'https:' && (
         allowedExternal.has(url) ||
+        url.startsWith('https://t.me/') ||
         (parsed.hostname === 'github.com' && parsed.pathname.startsWith('/marcovernetto-lgtm/SecureCopy'))
       )) {
         shell.openExternal(url).catch(error => sendLog('WARNING', error.message));

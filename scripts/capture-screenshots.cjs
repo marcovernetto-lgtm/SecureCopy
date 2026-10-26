@@ -84,10 +84,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     await waitFor(() => evaluate('document.readyState === "complete" && !!window.electronAPI'));
 
-    // Set high-DPI retina viewport (1200x820 @ 2x)
+    // High-DPI retina viewport (1240x840 @ 2x)
     await command('Emulation.setDeviceMetricsOverride', {
-      width: 1200,
-      height: 820,
+      width: 1240,
+      height: 840,
       deviceScaleFactor: 2,
       mobile: false
     });
@@ -96,12 +96,12 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     // 1. HOME SCREEN
     await evaluate(`switchScreen('home')`);
-    await delay(600);
+    await delay(500);
     let snap = await command('Page.captureScreenshot', { format: 'png' });
     await fs.writeFile(path.join(outDir, '01-home.png'), Buffer.from(snap.data, 'base64'));
     console.log('✓ 01-home.png catturato');
 
-    // 2. COPIA SICURA (Offload set-up for Videomakers / Photographers)
+    // 2. COPIA SICURA - Setup con destinazioni multiple
     await evaluate(`
       showSetupScreen();
       sourcePaths = [
@@ -110,27 +110,37 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         '/Volumes/SONY_FX3_A01/DCIM/100MSDCF'
       ];
       destPaths = [
-        '/Volumes/RAID_MASTER/PROGETTO_CINEMA_2026/GIORNO_01',
-        '/Volumes/BACKUP_PORTABLE_01/PROGETTO_CINEMA_2026/GIORNO_01'
+        '/Volumes/RAID_MASTER/PROGETTO_CINEMA/GIORNO_01',
+        '/Volumes/SSD_BACKUP_01/PROGETTO_CINEMA/GIORNO_01'
       ];
       renderSources();
       renderDestinations();
       updateStartButtonState();
+      updateCopyRecoveryUI(0);
     `);
-    await delay(600);
+    await delay(500);
     snap = await command('Page.captureScreenshot', { format: 'png' });
     await fs.writeFile(path.join(outDir, '02-copia-sicura.png'), Buffer.from(snap.data, 'base64'));
     console.log('✓ 02-copia-sicura.png catturato');
 
-    // 3. OPERAZIONI (Live data transfer flow, real-time SHA-256 verification)
+    // 3. COPIA SICURA - Con Banner Ripresa o Cancellazione (X)
+    await evaluate(`
+      updateCopyRecoveryUI(1);
+    `);
+    await delay(400);
+    snap = await command('Page.captureScreenshot', { format: 'png' });
+    await fs.writeFile(path.join(outDir, '03-riprendi-copia.png'), Buffer.from(snap.data, 'base64'));
+    console.log('✓ 03-riprendi-copia.png catturato');
+
+    // 4. OPERAZIONI LIVE - Trasferimento dati e verifica SHA-256
     await evaluate(`(() => {
       switchScreen('monitor');
       const mockJob = {
         id: 'mock-offload-job',
-        description: 'Offload Scheda SONY FX3 · Master RAID + Backup SSD',
+        description: 'Scarico Scheda SONY FX3 · Master RAID + Backup SSD',
         status: 'copying',
         sources: ['/Volumes/SONY_FX3_A01/CLIP'],
-        destinations: ['/Volumes/RAID_MASTER/PROGETTO_CINEMA_2026/GIORNO_01'],
+        destinations: ['/Volumes/RAID_MASTER/PROGETTO_CINEMA/GIORNO_01'],
         totalFiles: 24,
         copied: 16,
         progress: 68,
@@ -154,9 +164,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       const flowDest = document.getElementById('flow-dest-name');
       if (flowDest) flowDest.textContent = 'RAID_MASTER / GIORNO_01';
       const flowDestPath = document.getElementById('flow-dest-path');
-      if (flowDestPath) flowDestPath.textContent = '/Volumes/RAID_MASTER/PROGETTO_CINEMA_2026/GIORNO_01';
-      const spdTag = document.getElementById('flow-speed-tag');
-      if (spdTag) spdTag.textContent = '685 MB/s · SHA-256 Verificato in tempo reale';
+      if (flowDestPath) flowDestPath.textContent = '/Volumes/RAID_MASTER/PROGETTO_CINEMA/GIORNO_01';
 
       // Update progress card
       const progSection = document.getElementById('progress-section');
@@ -178,6 +186,13 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       const curBar = document.getElementById('current-file-bar');
       if (curBar) curBar.style.width = '72%';
 
+      // Speed metrics
+      const speedSpan = document.getElementById('progress-speed');
+      if (speedSpan) {
+        speedSpan.textContent = '685 MB/s · Verifica SHA-256 in tempo reale';
+        speedSpan.classList.remove('hidden');
+      }
+
       // Animate background flow particles
       const flowTrack = document.getElementById('data-flow-track');
       if (flowTrack) {
@@ -185,31 +200,78 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         flowTrack.style.opacity = '0.35';
       }
 
-      // Hide empty operations note
       const opEmpty = document.getElementById('operations-empty');
       if (opEmpty) opEmpty.classList.add('hidden');
+      document.getElementById('result-summary').classList.add('hidden');
+      document.getElementById('open-copy-destination-btn').classList.add('hidden');
+      document.getElementById('export-dit-report-btn').classList.add('hidden');
     })()`);
     await delay(700);
     snap = await command('Page.captureScreenshot', { format: 'png' });
-    await fs.writeFile(path.join(outDir, '03-operazioni-live.png'), Buffer.from(snap.data, 'base64'));
-    console.log('✓ 03-operazioni-live.png catturato');
+    await fs.writeFile(path.join(outDir, '04-operazioni-live.png'), Buffer.from(snap.data, 'base64'));
+    console.log('✓ 04-operazioni-live.png catturato');
 
-    // 4. CONFRONTA CARTELLE (Folder Comparison Setup & Difference Analysis)
+    // 5. RISULTATI COPIA - Completata al 100% con report DIT pronto
+    await evaluate(`(() => {
+      switchScreen('monitor');
+      const mockJob = {
+        id: 'mock-offload-job',
+        description: 'Scarico Scheda SONY FX3 · Master RAID + Backup SSD',
+        status: 'completed',
+        totalFiles: 24,
+        copied: 24,
+        progress: 100
+      };
+      operations = [mockJob];
+      focusedJobId = mockJob.id;
+
+      const progStatus = document.getElementById('progress-status');
+      if (progStatus) progStatus.textContent = 'Copia completata e certificata';
+      const progDetails = document.getElementById('progress-details');
+      if (progDetails) progDetails.textContent = 'Tutti i 24 file verificati byte per byte (0 errori)';
+      const progPct = document.getElementById('progress-percentage');
+      if (progPct) progPct.textContent = '100%';
+      const progBar = document.getElementById('progress-bar');
+      if (progBar) progBar.style.width = '100%';
+
+      const curPanel = document.getElementById('current-file-panel');
+      if (curPanel) curPanel.classList.add('hidden');
+      const speedSpan = document.getElementById('progress-speed');
+      if (speedSpan) speedSpan.classList.add('hidden');
+
+      const resSummary = document.getElementById('result-summary');
+      if (resSummary) {
+        resSummary.textContent = 'Completata — 24 copiati · 0 già validi · 0 problemi';
+        resSummary.classList.remove('hidden');
+      }
+      const openDest = document.getElementById('open-copy-destination-btn');
+      if (openDest) openDest.classList.remove('hidden');
+      const expReport = document.getElementById('export-dit-report-btn');
+      if (expReport) expReport.classList.remove('hidden');
+      const newCopy = document.getElementById('new-copy-btn');
+      if (newCopy) newCopy.classList.remove('hidden');
+    })()`);
+    await delay(600);
+    snap = await command('Page.captureScreenshot', { format: 'png' });
+    await fs.writeFile(path.join(outDir, '05-risultati-copia.png'), Buffer.from(snap.data, 'base64'));
+    console.log('✓ 05-risultati-copia.png catturato');
+
+    // 6. CONFRONTA CARTELLE - Setup
     await evaluate(`(() => {
       switchScreen('compare');
       setCompareStage('setup');
       compareLeft = '/Volumes/SONY_FX3_A01/CLIP';
-      compareRight = '/Volumes/RAID_MASTER/PROGETTO_CINEMA_2026/GIORNO_01';
+      compareRight = '/Volumes/RAID_MASTER/PROGETTO_CINEMA/GIORNO_01';
       renderCompareSelections();
       resetComparisonAfterSelection();
     })()`);
     await delay(500);
     snap = await command('Page.captureScreenshot', { format: 'png' });
-    await fs.writeFile(path.join(outDir, '04-confronta-cartelle-setup.png'), Buffer.from(snap.data, 'base64'));
-    console.log('✓ 04-confronta-cartelle-setup.png catturato');
+    await fs.writeFile(path.join(outDir, '06-confronta-cartelle-setup.png'), Buffer.from(snap.data, 'base64'));
+    console.log('✓ 06-confronta-cartelle-setup.png catturato');
 
+    // 7. CONFRONTA CARTELLE - Risultati con barra proporzionale, filtri e tabella
     await evaluate(`(() => {
-      // Show results panel with realistic comparison data
       setCompareStage('results');
       compareResult = {
         mode: 'deep',
@@ -231,10 +293,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     })()`);
     await delay(600);
     snap = await command('Page.captureScreenshot', { format: 'png' });
-    await fs.writeFile(path.join(outDir, '04-confronta-cartelle.png'), Buffer.from(snap.data, 'base64'));
-    console.log('✓ 04-confronta-cartelle.png catturato');
+    await fs.writeFile(path.join(outDir, '07-confronta-cartelle-risultati.png'), Buffer.from(snap.data, 'base64'));
+    console.log('✓ 07-confronta-cartelle-risultati.png catturato');
 
-    // 5. Impostazioni
+    // 8. IMPOSTAZIONI - Desktop Pro, pallino Apple verde, guida Telegram a scomparsa, selettore conservazione
     await evaluate(`(() => {
       const box = document.getElementById('credits-box');
       box.style.display = 'flex';
@@ -252,11 +314,23 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
           updateTelegramTutorialVisibility();
         }
       }
+      const retSelect = document.getElementById('report-retention-select');
+      if (retSelect) retSelect.value = '20';
     })()`);
     await delay(500);
     snap = await command('Page.captureScreenshot', { format: 'png' });
-    await fs.writeFile(path.join(outDir, '05-impostazioni.png'), Buffer.from(snap.data, 'base64'));
-    console.log('✓ 05-impostazioni.png catturato');
+    await fs.writeFile(path.join(outDir, '08-impostazioni.png'), Buffer.from(snap.data, 'base64'));
+    console.log('✓ 08-impostazioni.png catturato');
+
+    // 9. REPORT DIT PDF - Mantieni il file di certificazione
+    const existingDit = path.join(outDir, '06-report-dit.png');
+    const targetDit = path.join(outDir, '09-report-dit.png');
+    try {
+      await fs.copyFile(existingDit, targetDit);
+      console.log('✓ 09-report-dit.png sincronizzato');
+    } catch (e) {
+      console.log('Nota DIT report:', e.message);
+    }
 
     console.log('Tutti gli screenshot sono stati salvati con successo in docs/screenshots/');
   } finally {

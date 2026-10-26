@@ -13,6 +13,89 @@ const { pathSelection } = require('./path-selection');
 
 const execFileAsync = promisify(execFile);
 
+const VIDEO_EXTENSIONS = new Set([
+  '.mov', '.mp4', '.m4v', '.mxf', '.r3d', '.braw', '.ari', '.arx',
+  '.avi', '.mkv', '.crm', '.cine', '.webm', '.flv', '.vob', '.mts', '.m2ts'
+]);
+
+const RAW_PHOTO_EXTENSIONS = new Set([
+  '.cr2', '.cr3', '.nef', '.arw', '.dng', '.orf', '.rw2', '.pef',
+  '.raf', '.3fr', '.iiq', '.srw', '.erf', '.mrw', '.kdc', '.mos', '.raw'
+]);
+
+const JPEG_PHOTO_EXTENSIONS = new Set([
+  '.jpg', '.jpeg', '.jpe', '.heic', '.heif', '.hif', '.png', '.webp',
+  '.tiff', '.tif', '.bmp', '.gif'
+]);
+
+const CAMERA_JUNK_DIRS = new Set([
+  'dcim', 'private', 'm4root', 'clip', 'contents', 'clpr', 'sub', 'bavc', 'xdroot', 'cueup', 'medpro'
+]);
+
+function categorizeMediaFile(filePath, allFiles) {
+  const ext = path.extname(filePath || '').toLowerCase();
+  if (VIDEO_EXTENSIONS.has(ext)) return 'Video';
+  if (RAW_PHOTO_EXTENSIONS.has(ext)) return 'Foto RAW';
+  if (JPEG_PHOTO_EXTENSIONS.has(ext)) return 'Foto JPEG';
+
+  if (ext === '.xmp') {
+    const baseWithoutExt = path.basename(filePath).replace(/\.xmp$/i, '').toLowerCase();
+    const match = allFiles?.find(f => {
+      const p = f.path || f;
+      if (p === filePath) return false;
+      const b = path.basename(p).toLowerCase();
+      return b.startsWith(baseWithoutExt) || b === baseWithoutExt;
+    });
+    if (match) {
+      const matchExt = path.extname(match.path || match).toLowerCase();
+      if (RAW_PHOTO_EXTENSIONS.has(matchExt)) return 'Foto RAW';
+      if (JPEG_PHOTO_EXTENSIONS.has(matchExt)) return 'Foto JPEG';
+      if (VIDEO_EXTENSIONS.has(matchExt)) return 'Video';
+    }
+    return 'Foto RAW';
+  }
+  if (['.thm', '.lrf', '.xml'].includes(ext)) {
+    return 'Video';
+  }
+  return null;
+}
+
+function getCleanRelativePath(itemRelative, category, planFiles) {
+  const segments = itemRelative.split(path.sep).filter(Boolean);
+  const baseName = path.basename(itemRelative);
+
+  const meaningfulSegments = segments.slice(0, -1).filter(seg => {
+    const s = seg.toLowerCase();
+    if (CAMERA_JUNK_DIRS.has(s)) return false;
+    if (/^\d{3}[a-z0-9_]+$/i.test(s)) return false;
+    return true;
+  });
+
+  const duplicates = planFiles ? planFiles.filter(f => path.basename(f.path || f) === baseName) : [];
+  if (duplicates.length > 1 && segments.length > 1) {
+    const parentDir = segments[segments.length - 2];
+    return path.join(parentDir, baseName);
+  }
+
+  if (meaningfulSegments.length > 0) {
+    return path.join(...meaningfulSegments, baseName);
+  }
+
+  return baseName;
+}
+
+function resolveDestinationRelative(item, planFiles, mediaSeparation) {
+  if (!mediaSeparation) {
+    return path.join(item.source.name, item.relative);
+  }
+  const category = categorizeMediaFile(item.path, planFiles);
+  if (!category) {
+    return path.join(item.source.name, item.relative);
+  }
+  const cleanSub = getCleanRelativePath(item.relative || path.basename(item.path), category, planFiles);
+  return path.join(item.source.name, category, cleanSub);
+}
+
 function cancelled(signal) {
   if (signal?.aborted) {
     const error = new Error('Operazione annullata');
@@ -596,7 +679,7 @@ async function copyFileVerified(item, destination, { signal, onBytes, onPhase, o
   }
 }
 
-async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onProgress, policy = 'replace', onlyPaths, allowMetadataDifferences = true }) {
+async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onProgress, policy = 'replace', onlyPaths, allowMetadataDifferences = true, mediaSeparation = false }) {
   const selection = onlyPaths === undefined ? null : pathSelection(onlyPaths);
   const { sources, destRoot } = await preparePaths(sourceDirs, destDir);
   const rootGuard = await captureDirectory(destRoot);
@@ -644,25 +727,28 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
   let createdDirectories = false;
 
   try {
-    for (const directory of plan.directories) {
-      cancelled(signal);
-      const targetRoot = path.join(destRoot, directory.source.name);
-      try {
-        const key = path.join(directory.source.name, directory.relative);
-        if (blockedDirectories.some(parent => key === parent || key.startsWith(parent + path.sep))) continue;
-        await assertDirectory(rootGuard);
-        if (!await statOrNull(path.join(targetRoot, directory.relative))) createdDirectories = true;
-        await ensureSafeDirectory(destRoot, path.join(directory.source.name, directory.relative));
-        await claimDestination(key);
+    if (!mediaSeparation) {
+      for (const directory of plan.directories) {
+        cancelled(signal);
+        const targetRoot = path.join(destRoot, directory.source.name);
+        try {
+          const key = path.join(directory.source.name, directory.relative);
+          if (blockedDirectories.some(parent => key === parent || key.startsWith(parent + path.sep))) continue;
+          await assertDirectory(rootGuard);
+          if (!await statOrNull(path.join(targetRoot, directory.relative))) createdDirectories = true;
+          await ensureSafeDirectory(destRoot, path.join(directory.source.name, directory.relative));
+          await claimDestination(key);
+        }
+        catch (error) { blockedDirectories.push(path.join(directory.source.name, directory.relative)); report.failures.push({ path: path.join(directory.source.root, directory.relative), reason: error.message }); }
       }
-      catch (error) { blockedDirectories.push(path.join(directory.source.name, directory.relative)); report.failures.push({ path: path.join(directory.source.root, directory.relative), reason: error.message }); }
     }
 
     for (const item of plan.files) {
       cancelled(signal);
       await waitIfPaused?.(signal);
       cancelled(signal);
-      const relative = path.join(item.source.name, item.relative);
+      const sourceKey = path.join(item.source.name, item.relative);
+      const relative = resolveDestinationRelative(item, plan.files, mediaSeparation);
       const destination = path.join(destRoot, relative);
       let currentTransferred = 0;
       let verifiedHash = null;
@@ -700,10 +786,10 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
         },
         onVerified: (hash, fork) => { verifiedHash = hash; verifiedFork = fork; }
         });
-        if (verifiedHash) { verifiedSnapshots.set(relative, snapshot(await fsp.lstat(finalDestination))); await claimDestination(path.relative(destRoot, finalDestination)); }
+        if (verifiedHash) { verifiedSnapshots.set(sourceKey, snapshot(await fsp.lstat(finalDestination))); await claimDestination(path.relative(destRoot, finalDestination)); }
         report[result]++;
         if (result === 'kept') report.failures.push({ path: item.path, reason: 'Saltato per scelta: il file di destinazione ha un contenuto diverso e non è stato sostituito.' });
-        if (verifiedHash) report.verifiedFiles.push({ path: path.relative(destRoot, finalDestination), sourceRelative: relative, sha256: verifiedHash, resourceFork: verifiedFork, bytes: item.stats.size,
+        if (verifiedHash) report.verifiedFiles.push({ path: path.relative(destRoot, finalDestination), sourceRelative: sourceKey, sha256: verifiedHash, resourceFork: verifiedFork, bytes: item.stats.size,
           createdAt: item.stats.birthtime.toISOString(), modifiedAt: item.stats.mtime.toISOString(), previousVersion, status: result });
         if (result === 'copied') report.transferredBytes += item.stats.size;
         onLog?.('SUCCESS', `${result === 'copied' ? 'Verificato' : result === 'kept' ? 'Saltato per scelta' : 'Già valido'}: ${relative}`);
@@ -713,8 +799,8 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
           const result = error.copyResult || 'skipped';
           report[result]++;
           if (result === 'copied') report.transferredBytes += item.stats.size;
-          verifiedSnapshots.set(relative, snapshot(await fsp.lstat(error.destination)));
-          report.verifiedFiles.push({ path: path.relative(destRoot, error.destination), sourceRelative: relative, sha256: error.sha256, resourceFork: error.resourceFork || null, bytes: item.stats.size,
+          verifiedSnapshots.set(sourceKey, snapshot(await fsp.lstat(error.destination)));
+          report.verifiedFiles.push({ path: path.relative(destRoot, error.destination), sourceRelative: sourceKey, sha256: error.sha256, resourceFork: error.resourceFork || null, bytes: item.stats.size,
             createdAt: item.stats.birthtime.toISOString(), modifiedAt: item.stats.mtime.toISOString(), previousVersion: error.previousVersion || previousVersion,
             status: result, creationDatePreserved: false });
         }
@@ -732,19 +818,21 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
     }
 
     // Writing children changes directory modification times; restore them last.
-    for (const directory of (report.copied || createdDirectories ? plan.directories.reverse() : [])) {
-      const target = path.join(destRoot, directory.source.name, directory.relative);
-      try {
-        const key = path.join(directory.source.name, directory.relative);
-        if (blockedDirectories.some(parent => key === parent || key.startsWith(parent + path.sep))) continue;
-        await assertDirectory(rootGuard);
-        const stats = await fsp.lstat(target);
-        if (!stats.isDirectory() || stats.isSymbolicLink()) throw new Error('La directory di destinazione è cambiata.');
-        await preserveMetadata(() => fsp.chmod(target, directory.stats.mode & 0o777), 'Permessi della cartella non conservati dal disco.', signal, allowMetadataDifferences, reason => warning(target, reason));
-        await preserveMetadata(() => fsp.utimes(target, directory.stats.atime, directory.stats.mtime), 'Date della cartella non conservate dal disco.', signal, allowMetadataDifferences, reason => warning(target, reason));
-      } catch (error) {
-        cancelled(signal);
-        report.failures.push({ path: path.join(directory.source.root, directory.relative), reason: `Cartella da controllare: ${error.message}` });
+    if (!mediaSeparation) {
+      for (const directory of (report.copied || createdDirectories ? plan.directories.reverse() : [])) {
+        const target = path.join(destRoot, directory.source.name, directory.relative);
+        try {
+          const key = path.join(directory.source.name, directory.relative);
+          if (blockedDirectories.some(parent => key === parent || key.startsWith(parent + path.sep))) continue;
+          await assertDirectory(rootGuard);
+          const stats = await fsp.lstat(target);
+          if (!stats.isDirectory() || stats.isSymbolicLink()) throw new Error('La directory di destinazione è cambiata.');
+          await preserveMetadata(() => fsp.chmod(target, directory.stats.mode & 0o777), 'Permessi della cartella non conservati dal disco.', signal, allowMetadataDifferences, reason => warning(target, reason));
+          await preserveMetadata(() => fsp.utimes(target, directory.stats.atime, directory.stats.mtime), 'Date della cartella non conservate dal disco.', signal, allowMetadataDifferences, reason => warning(target, reason));
+        } catch (error) {
+          cancelled(signal);
+          report.failures.push({ path: path.join(directory.source.root, directory.relative), reason: `Cartella da controllare: ${error.message}` });
+        }
       }
     }
     // Confirm coverage at the end too: cards can gain files and destinations can
@@ -801,11 +889,13 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
       }
     }
     report.verifiedFiles = valid;
-    for (const directory of plan.directories) {
-      try {
-        const stats = await fsp.lstat(path.join(destRoot, directory.source.name, directory.relative));
-        if (!stats.isDirectory() || stats.isSymbolicLink()) throw new Error('Cartella di destinazione mancante o sostituita.');
-      } catch (error) { fail(path.join(directory.source.root, directory.relative), error.message); }
+    if (!mediaSeparation) {
+      for (const directory of plan.directories) {
+        try {
+          const stats = await fsp.lstat(path.join(destRoot, directory.source.name, directory.relative));
+          if (!stats.isDirectory() || stats.isSymbolicLink()) throw new Error('Cartella di destinazione mancante o sostituita.');
+        } catch (error) { fail(path.join(directory.source.root, directory.relative), error.message); }
+      }
     }
     if (report.failures.length) report.status = 'partial';
     return report;
@@ -815,4 +905,4 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
   }
 }
 
-module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, readResourceFork, sameResourceFork, requireCreationDate };
+module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, readResourceFork, sameResourceFork, requireCreationDate, categorizeMediaFile };

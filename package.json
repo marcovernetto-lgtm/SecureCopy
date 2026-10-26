@@ -1,6 +1,6 @@
 {
   "name": "secure-copier",
-  "version": "2.7.8",
+  "version": "2.8.0",
   "description": "Copia e verifica file in modo sicuro con checksum SHA-256",
   "main": "main.js",
   "author": "unshapedstudio",

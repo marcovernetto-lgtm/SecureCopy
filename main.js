@@ -38,6 +38,36 @@ let recoveryStore = null;
 let lastRecoveryWrite = 0;
 const reportRetentionDays = RETENTION_DAYS;
 let retentionTimer = null;
+let mediaSettings = {
+  mediaSeparation: false,
+  soundAlerts: true,
+  autoEject: false
+};
+
+async function loadMediaSettings() {
+  try {
+    const file = path.join(app.getPath('userData'), 'media-settings.json');
+    const data = JSON.parse(await fs.promises.readFile(file, 'utf8'));
+    if (typeof data.mediaSeparation === 'boolean') mediaSettings.mediaSeparation = data.mediaSeparation;
+    if (typeof data.soundAlerts === 'boolean') mediaSettings.soundAlerts = data.soundAlerts;
+    if (typeof data.autoEject === 'boolean') mediaSettings.autoEject = data.autoEject;
+  } catch { /* defaults */ }
+}
+
+async function saveMediaSettings(newSettings) {
+  if (typeof newSettings.mediaSeparation === 'boolean') mediaSettings.mediaSeparation = newSettings.mediaSeparation;
+  if (typeof newSettings.soundAlerts === 'boolean') mediaSettings.soundAlerts = newSettings.soundAlerts;
+  if (typeof newSettings.autoEject === 'boolean') mediaSettings.autoEject = newSettings.autoEject;
+  try {
+    const file = path.join(app.getPath('userData'), 'media-settings.json');
+    const temp = `${file}.${crypto.randomUUID()}.tmp`;
+    await fs.promises.writeFile(temp, JSON.stringify(mediaSettings, null, 2), { mode: 0o600, flag: 'wx' });
+    await fs.promises.rename(temp, file);
+  } catch (err) {
+    console.error('Salvataggio impostazioni media:', err.message);
+  }
+  return mediaSettings;
+}
 let retentionTask = null;
 let powerBlocker = null;
 const activeOperationCount = () => activeJobs.size + (compareController ? 1 : 0);
@@ -202,6 +232,7 @@ function createWindow(background = false) {
 
 app.whenReady().then(async () => {
   if (!primaryInstance) return;
+  await loadMediaSettings().catch(() => {});
   restoreQueue();
   try {
     const root = app.getPath('userData');
@@ -290,6 +321,8 @@ handle('recover-pending-copies', () => {
   return count;
 });
 handle('get-report-retention', () => reportRetentionDays);
+handle('get-media-settings', () => mediaSettings);
+handle('set-media-settings', async settings => saveMediaSettings(settings));
 handle('get-background-settings', () => backgroundService.getSettings());
 handle('set-login-startup', enabled => backgroundService.setLogin(enabled));
 handle('set-disk-notices', enabled => backgroundService.setDiskNotices(enabled));
@@ -439,6 +472,7 @@ function startJob(item) {
     for (let i=0; i<item.sourceDirs.length; i++) if (item.expectedSources?.[i] && !matches(item.expectedSources[i], snapshot(fs.statSync(item.sourceDirs[i])), true)) throw new Error('Il disco sorgente è cambiato. Selezionalo di nuovo.');
     return runCopy({
     sourceDirs: item.sourceDirs, destDir: item.destDir, policy: item.policy || 'replace', onlyPaths: item.onlyPaths, signal: controller.signal,
+    mediaSeparation: mediaSettings.mediaSeparation,
     waitIfPaused,
     onLog: (level, message) => sendLog(level, `[${item.description}] ${message}`),
     onProgress: progress => {
@@ -522,6 +556,22 @@ async function finishJob(item, report) {
   sendLog(report.status === 'completed' ? 'COMPLETE' : 'WARNING',
     `${item.description}: ${report.status}, ${item.filesCopied} copiati, ${item.filesSkipped} già validi, ${item.filesFailed} problemi.`);
   if (report.status === 'completed') send('play-completion-sound', 'Assets/SOUND.mp3');
+  if (mediaSettings.soundAlerts !== false && process.platform === 'darwin') {
+    const sound = report.status === 'completed' && (!report.failures || !report.failures.length)
+      ? '/System/Library/Sounds/Glass.aiff'
+      : '/System/Library/Sounds/Sosumi.aiff';
+    require('child_process').execFile('/usr/bin/afplay', [sound], () => {});
+  }
+  if (mediaSettings.autoEject === true && report.status === 'completed' && (!report.failures || !report.failures.length) && process.platform === 'darwin') {
+    for (const src of (item.sourceDirs || [])) {
+      if (typeof src === 'string' && src.startsWith('/Volumes/')) {
+        const mountPoint = src.split(path.sep).slice(0, 3).join(path.sep);
+        require('child_process').execFile('/usr/sbin/diskutil', ['eject', mountPoint], () => {
+          sendLog('INFO', `Supporto ${path.basename(mountPoint)} espulso in sicurezza.`);
+        });
+      }
+    }
+  }
   updateQueue();
   scheduleQueue();
 }

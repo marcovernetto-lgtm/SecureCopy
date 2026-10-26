@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectMultipleFolders: () => ipcRenderer.invoke('dialog:openMultipleDirectories'),
     getPathForFile: (file) => webUtils.getPathForFile(file),
     getBackgroundSettings: () => ipcRenderer.invoke('get-background-settings'),
+    getMediaSettings: () => ipcRenderer.invoke('get-media-settings'),
+    setMediaSettings: (settings) => ipcRenderer.invoke('set-media-settings', settings),
     setLoginStartup: enabled => ipcRenderer.invoke('set-login-startup', enabled),
     setDiskNotices: enabled => ipcRenderer.invoke('set-disk-notices', enabled),
     onBackgroundSettingsUpdated: callback => ipcRenderer.on('background-settings-updated', (_event, settings) => callback(settings)),

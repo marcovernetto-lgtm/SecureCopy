@@ -65,7 +65,7 @@ function createUpdater(options = {}) {
     try {
       return appRef?.getVersion() || require('./package.json').version;
     } catch {
-      return '2.7.8';
+      return '2.8.0';
     }
   });
   const getLanguage = options.getLanguage || (() => 'it');

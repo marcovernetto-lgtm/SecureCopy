@@ -1787,6 +1787,50 @@ diskNoticesToggle.addEventListener('change', async () => {
     catch (error) { diskNoticesToggle.checked = !enabled; showError(error.message); }
     finally { diskNoticesToggle.disabled = false; }
 });
+
+const mediaSeparationToggle = document.getElementById('media-separation');
+const soundAlertsToggle = document.getElementById('sound-alerts');
+const autoEjectToggle = document.getElementById('auto-eject');
+
+async function renderMediaSettings(settings) {
+    if (!settings) return;
+    if (mediaSeparationToggle) mediaSeparationToggle.checked = !!settings.mediaSeparation;
+    if (soundAlertsToggle) soundAlertsToggle.checked = settings.soundAlerts !== false;
+    if (autoEjectToggle) autoEjectToggle.checked = !!settings.autoEject;
+}
+
+window.electronAPI?.getMediaSettings?.().then(renderMediaSettings).catch(console.error);
+
+if (mediaSeparationToggle) {
+    mediaSeparationToggle.addEventListener('change', async () => {
+        try {
+            await window.electronAPI?.setMediaSettings?.({ mediaSeparation: mediaSeparationToggle.checked });
+        } catch (error) {
+            mediaSeparationToggle.checked = !mediaSeparationToggle.checked;
+            showError(error.message);
+        }
+    });
+}
+if (soundAlertsToggle) {
+    soundAlertsToggle.addEventListener('change', async () => {
+        try {
+            await window.electronAPI?.setMediaSettings?.({ soundAlerts: soundAlertsToggle.checked });
+        } catch (error) {
+            soundAlertsToggle.checked = !soundAlertsToggle.checked;
+            showError(error.message);
+        }
+    });
+}
+if (autoEjectToggle) {
+    autoEjectToggle.addEventListener('change', async () => {
+        try {
+            await window.electronAPI?.setMediaSettings?.({ autoEject: autoEjectToggle.checked });
+        } catch (error) {
+            autoEjectToggle.checked = !autoEjectToggle.checked;
+            showError(error.message);
+        }
+    });
+}
 window.electronAPI?.onDiskImportRequested?.(request => {
     if (!request || typeof request.root !== 'string') return;
     if (creditsBox.style.display !== 'none') closeSettings();

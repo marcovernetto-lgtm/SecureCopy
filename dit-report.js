@@ -28,6 +28,52 @@ async function findFFprobe() {
   return null;
 }
 
+let cachedFFmpegPath = undefined;
+async function findFFmpeg() {
+  if (cachedFFmpegPath !== undefined) return cachedFFmpegPath;
+  const candidates = [
+    '/opt/homebrew/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    'ffmpeg'
+  ];
+  for (const candidate of candidates) {
+    try {
+      await execFileAsync(candidate, ['-version'], { timeout: 2000 });
+      cachedFFmpegPath = candidate;
+      return candidate;
+    } catch {
+      // Continue to next candidate
+    }
+  }
+  cachedFFmpegPath = null;
+  return null;
+}
+
+async function extractVideoThumbnail(filePath) {
+  const ffmpeg = await findFFmpeg();
+  if (!ffmpeg) return null;
+  const os = require('os');
+  const crypto = require('crypto');
+  const tmpThumb = path.join(os.tmpdir(), `sc-thumb-${crypto.randomUUID()}.jpg`);
+  try {
+    await execFileAsync(ffmpeg, [
+      '-ss', '00:00:01',
+      '-i', filePath,
+      '-vframes', '1',
+      '-vf', 'scale=140:-1',
+      '-q:v', '4',
+      '-y',
+      tmpThumb
+    ], { timeout: 3000 });
+    const buf = await fsp.readFile(tmpThumb);
+    return `data:image/jpeg;base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  } finally {
+    await fsp.unlink(tmpThumb).catch(() => {});
+  }
+}
+
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
   if (bytes === 0) return '0 B';
@@ -119,6 +165,9 @@ async function probeMediaFile(filePath) {
         else if (video.width >= 3800) label = ' (4K UHD)';
         else if (video.width >= 1900) label = ' (1080p FHD)';
         info.resolution = `${video.width} × ${video.height}${label}`;
+        try {
+          info.thumbnail = await extractVideoThumbnail(filePath);
+        } catch {}
       }
 
       info.codec = friendlyCodec(video.codec_tag_string, video.codec_name, video.codec_long_name);
@@ -247,6 +296,7 @@ function generateDITReportHTML(reportData, probedFiles) {
               <strong class="file-name" title="${path.basename(file.path || '')}">${path.basename(file.path || '')}</strong>
             </div>
             ${showRelPath}
+            ${meta.thumbnail ? `<div class="file-thumb-wrap"><img src="${meta.thumbnail}" class="file-thumb-img" alt="Thumbnail" /></div>` : ''}
           </div>
 
           <div class="hash-box">
@@ -544,6 +594,21 @@ function generateDITReportHTML(reportData, probedFiles) {
       margin-top: 2px;
       word-break: break-all;
       line-height: 1.2;
+    }
+    .file-thumb-wrap {
+      margin-top: 5px;
+      width: 68px;
+      height: 40px;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid #1a2c35;
+      background: #081014;
+    }
+    .file-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .hash-box {

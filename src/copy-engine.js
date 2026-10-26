@@ -84,7 +84,10 @@ function getCleanRelativePath(itemRelative, category, planFiles) {
   return baseName;
 }
 
-function resolveDestinationRelative(item, planFiles, mediaSeparation) {
+function resolveDestinationRelative(item, planFiles, mediaSeparation, collisionMap) {
+  if (collisionMap && collisionMap.has(item)) {
+    return collisionMap.get(item);
+  }
   if (!mediaSeparation) {
     return path.join(item.source.name, item.relative);
   }
@@ -94,6 +97,41 @@ function resolveDestinationRelative(item, planFiles, mediaSeparation) {
   }
   const cleanSub = getCleanRelativePath(item.relative || path.basename(item.path), category, planFiles);
   return path.join(item.source.name, category, cleanSub);
+}
+
+function detectCaseCollisions(planFiles, mediaSeparation) {
+  const byLower = new Map();
+  for (const item of planFiles) {
+    const rawDest = resolveDestinationRelative(item, planFiles, mediaSeparation);
+    const key = (process.platform === 'darwin' || process.platform === 'win32')
+      ? rawDest.toLowerCase() : rawDest;
+    if (!byLower.has(key)) byLower.set(key, []);
+    byLower.get(key).push({ item, rawDest });
+  }
+
+  const collisionMap = new Map();
+  for (const group of byLower.values()) {
+    if (group.length > 1) {
+      const usedPaths = new Set();
+      for (const entry of group) {
+        const dir = path.dirname(entry.rawDest);
+        const base = path.basename(entry.rawDest);
+        const uppers = (base.match(/[A-Z]/g) || []).length;
+        const lowers = (base.match(/[a-z]/g) || []).length;
+        let subfolder = uppers > lowers ? 'File Maiuscoli' : (lowers > uppers ? 'File Minuscoli' : 'File Misti');
+        let candidate = path.join(dir, subfolder, base);
+        let variantIdx = 2;
+        while (usedPaths.has(candidate.toLowerCase())) {
+          subfolder = `Variante ${variantIdx}`;
+          candidate = path.join(dir, subfolder, base);
+          variantIdx++;
+        }
+        usedPaths.add(candidate.toLowerCase());
+        collisionMap.set(entry.item, candidate);
+      }
+    }
+  }
+  return collisionMap;
 }
 
 function cancelled(signal) {
@@ -109,6 +147,33 @@ function isInside(candidate, parent) {
     ? value.toLowerCase() : value;
   const relative = path.relative(normalize(parent), normalize(candidate));
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+async function resolveExistingVolumePath(targetPath) {
+  if (typeof targetPath !== 'string' || !targetPath.length) return targetPath;
+  try {
+    await fsp.access(targetPath);
+    return targetPath;
+  } catch (err) {
+    if (!targetPath.startsWith('/Volumes/')) return targetPath;
+    const parts = targetPath.split(path.sep);
+    const volName = parts[2];
+    if (!volName) return targetPath;
+    const baseVol = volName.replace(/\s+\d+$/, '');
+    const remaining = parts.slice(3).join(path.sep);
+    try {
+      const allVolumes = await fsp.readdir('/Volumes');
+      const candidates = allVolumes.filter(v => v === baseVol || v.replace(/\s+\d+$/, '') === baseVol);
+      for (const cand of candidates) {
+        const candidatePath = path.join('/Volumes', cand, remaining);
+        try {
+          await fsp.access(candidatePath);
+          return candidatePath;
+        } catch {}
+      }
+    } catch {}
+    return targetPath;
+  }
 }
 
 async function realPathForNewPath(target) {
@@ -133,7 +198,8 @@ async function preparePaths(sourceDirs, destination) {
 
   const sources = [];
   const names = new Set();
-  for (const input of sourceDirs) {
+  for (let input of sourceDirs) {
+    input = await resolveExistingVolumePath(input);
     const source = await fsp.realpath(input);
     const stats = await fsp.stat(source);
     if (!stats.isDirectory() && !stats.isFile()) {
@@ -146,6 +212,7 @@ async function preparePaths(sourceDirs, destination) {
     sources.push({ root: source, name, isFile: stats.isFile(), stats });
   }
 
+  destination = await resolveExistingVolumePath(destination);
   const destRoot = await realPathForNewPath(destination);
   for (const source of sources) {
     const target = path.join(destRoot, source.name);
@@ -743,12 +810,13 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
       }
     }
 
+    const collisionMap = detectCaseCollisions(plan.files, mediaSeparation);
     for (const item of plan.files) {
       cancelled(signal);
       await waitIfPaused?.(signal);
       cancelled(signal);
       const sourceKey = path.join(item.source.name, item.relative);
-      const relative = resolveDestinationRelative(item, plan.files, mediaSeparation);
+      const relative = resolveDestinationRelative(item, plan.files, mediaSeparation, collisionMap);
       const destination = path.join(destRoot, relative);
       let currentTransferred = 0;
       let verifiedHash = null;
@@ -905,4 +973,4 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
   }
 }
 
-module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, readResourceFork, sameResourceFork, requireCreationDate, categorizeMediaFile };
+module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, readResourceFork, sameResourceFork, requireCreationDate, categorizeMediaFile, resolveExistingVolumePath, detectCaseCollisions };

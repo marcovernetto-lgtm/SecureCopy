@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dismissPendingCopies: () => ipcRenderer.invoke('dismiss-pending-copies'),
     onPendingCopyRecoveryUpdated: callback => ipcRenderer.on('pending-copy-recovery-updated', (_event, count) => callback(count)),
     retryCopy: id => ipcRenderer.invoke('retry-copy', id),
+    checkDiskSpace: (sourcePaths, destPath) => ipcRenderer.invoke('check-disk-space', sourcePaths, destPath),
     startCopy: (sourcePaths, destPath, description) => ipcRenderer.invoke('start-copy', sourcePaths, destPath, description),
     startBatch: (sourcePaths, destPaths, mode, policy) => ipcRenderer.invoke('start-batch', sourcePaths, destPaths, mode, policy),
     cancelCopy: (id) => ipcRenderer.invoke('cancel-copy', id),

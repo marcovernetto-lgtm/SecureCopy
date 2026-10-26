@@ -492,6 +492,48 @@ function updateStartButtonState() {
         addToQueueBtn.classList.toggle('btn-queue-ready', valid);
         addToQueueBtn.textContent = activeCount ? 'Avvia al termine delle operazioni' : 'Aggiungi alla coda';
     }
+    checkDiskSpaceBanner();
+}
+
+const diskSpaceBanner = document.getElementById('disk-space-banner');
+let spaceCheckDebounce = null;
+
+function checkDiskSpaceBanner() {
+    if (!diskSpaceBanner) return;
+    if (!sourcePaths.length || !destPaths.length) {
+        diskSpaceBanner.classList.add('hidden');
+        diskSpaceBanner.replaceChildren();
+        return;
+    }
+    clearTimeout(spaceCheckDebounce);
+    spaceCheckDebounce = setTimeout(async () => {
+        try {
+            const info = await window.electronAPI.checkDiskSpace(sourcePaths, destPaths[0]);
+            if (!info || (!info.requiredBytes && !info.availableBytes)) {
+                diskSpaceBanner.classList.add('hidden');
+                return;
+            }
+            diskSpaceBanner.classList.remove('hidden', 'space-ok', 'space-warning');
+            const formatSize = bytes => {
+                if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+                if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                return (bytes / 1024).toFixed(0) + ' KB';
+            };
+            const req = formatSize(info.requiredBytes);
+            const avail = formatSize(info.availableBytes);
+            const targetName = info.destVolume || 'disco';
+
+            if (info.hasEnoughSpace) {
+                diskSpaceBanner.classList.add('space-ok');
+                diskSpaceBanner.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px"><span>✓</span> <span>Richiesti <b>${req}</b> · Disponibili su <i>${escapeHTML(targetName)}</i>: <b>${avail}</b> (Spazio sufficiente)</span></span>`;
+            } else {
+                diskSpaceBanner.classList.add('space-warning');
+                diskSpaceBanner.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px"><span>⚠️</span> <span>Spazio insufficiente su <i>${escapeHTML(targetName)}</i>: richiesti <b>${req}</b>, disponibili solo <b>${avail}</b></span></span>`;
+            }
+        } catch {
+            diskSpaceBanner.classList.add('hidden');
+        }
+    }, 150);
 }
 function renderSources() {
     sourcePathEl.textContent = sourcePaths.length

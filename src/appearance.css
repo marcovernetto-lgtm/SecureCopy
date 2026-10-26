@@ -1069,3 +1069,58 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 .recovery-dismiss-btn:active:not(:disabled) {
   transform: scale(0.94);
 }
+
+/* Microcopy rassicurazione e pre-flight check spazio disco */
+.source-safety-note {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.source-safety-note svg {
+  color: #38bdf8;
+}
+
+.copy-calm-note {
+  display: flex;
+  align-items: center;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 8px 0 6px 0;
+  padding: 7px 11px;
+  background: rgba(16, 185, 129, 0.07);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: 6px;
+  line-height: 1.4;
+}
+.copy-calm-note svg {
+  color: #10b981;
+}
+
+.disk-space-banner {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 12px;
+  margin: 10px 0 4px 0;
+  border-radius: 7px;
+  transition: all 0.2s ease;
+  line-height: 1.4;
+}
+.disk-space-banner.space-ok {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+.disk-space-banner.space-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}

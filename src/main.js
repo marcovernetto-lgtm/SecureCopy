@@ -3,7 +3,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const fs = require('fs');
 const crypto = require('crypto');
-const { runCopy } = require('./copy-engine');
+const { runCopy, resolveExistingVolumePath } = require('./copy-engine');
 const { RETENTION_DAYS, managedDirectory, cleanupArtifacts, saveActivityLog } = require('./artifact-retention');
 const { overlap, snapshot, matches } = require('./fs-safety');
 const { compareFolders, reconcileFolders, forRenderer, expandComparisonDecisions } = require('./compare-engine');
@@ -438,7 +438,35 @@ function validatePaths(sourceDirs, destDir) {
   }
   backgroundService?.validateSources(sourceDirs);
 }
+function resolveExistingVolumePathSync(targetPath) {
+  if (typeof targetPath !== 'string' || !targetPath.length) return targetPath;
+  try {
+    fs.accessSync(targetPath);
+    return targetPath;
+  } catch (err) {
+    if (!targetPath.startsWith('/Volumes/')) return targetPath;
+    const parts = targetPath.split(path.sep);
+    const volName = parts[2];
+    if (!volName) return targetPath;
+    const baseVol = volName.replace(/\s+\d+$/, '');
+    const remaining = parts.slice(3).join(path.sep);
+    try {
+      const allVolumes = fs.readdirSync('/Volumes');
+      const candidates = allVolumes.filter(v => v === baseVol || v.replace(/\s+\d+$/, '') === baseVol);
+      for (const cand of candidates) {
+        const candidatePath = path.join('/Volumes', cand, remaining);
+        try {
+          fs.accessSync(candidatePath);
+          return candidatePath;
+        } catch {}
+      }
+    } catch {}
+    return targetPath;
+  }
+}
+
 function canonicalSync(input) {
+  input = resolveExistingVolumePathSync(input);
   const absolute = path.resolve(input);
   try { return fs.realpathSync(absolute); } catch (error) {
     if (error.code !== 'ENOENT') throw error;
@@ -468,7 +496,7 @@ function conflictsWithActive(destDir, sourceDirs = []) {
   if (conflictsWithCopy) return true;
   const device = destinationDevice(target);
   const comparisonsOnDevice = compareController && comparisonItem?.operation === 'reconcile' && [comparisonItem.leftRoot,comparisonItem.rightRoot].some(root => destinationDevice(root) === device) ? 1 : 0;
-  if ([...activeJobs.values()].filter(({ item }) => destinationDevice(item.destDir) === device).length + comparisonsOnDevice >= 2) return true;
+  if ([...activeJobs.values()].filter(({ item }) => destinationDevice(item.destDir) === device).length + comparisonsOnDevice >= 1) return true;
   if (!compareController || !comparisonItem) return false;
   const roots = [comparisonItem.leftRoot, comparisonItem.rightRoot];
   return roots.some(root => pathsOverlap(root, target) ||
@@ -710,6 +738,56 @@ handle('retry-copy', id => {
   if (activeOperationCount() < MAX_ACTIVE_OPERATIONS && !conflictsWithActive(item.destDir,item.sourceDirs)) startJob(item);
   else { copyQueue.push(item); queueRunning=true; updateQueue(); }
   return item.id;
+});
+handle('check-disk-space', async (sourcePaths, destPath) => {
+  if (!Array.isArray(sourcePaths) || !sourcePaths.length || !destPath) {
+    return { requiredBytes: 0, availableBytes: 0, hasEnoughSpace: true };
+  }
+  try {
+    let totalRequired = 0;
+    for (const src of sourcePaths) {
+      const resolved = await resolveExistingVolumePath(src);
+      try {
+        const stats = await fs.promises.stat(resolved);
+        if (stats.isFile()) {
+          totalRequired += stats.size;
+        } else if (stats.isDirectory()) {
+          const stack = [resolved];
+          while (stack.length) {
+            const current = stack.pop();
+            const entries = await fs.promises.readdir(current, { withFileTypes: true });
+            for (const entry of entries) {
+              if (entry.name.startsWith('.')) continue;
+              const child = path.join(current, entry.name);
+              if (entry.isDirectory()) stack.push(child);
+              else if (entry.isFile()) {
+                const s = await fs.promises.stat(child);
+                totalRequired += s.size;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const resolvedDest = await resolveExistingVolumePath(destPath);
+    let target = resolvedDest;
+    while (!fs.existsSync(target) && path.dirname(target) !== target) {
+      target = path.dirname(target);
+    }
+    const statfs = await fs.promises.statfs(target);
+    const available = statfs.bavail * statfs.bsize;
+    const destVolume = target.startsWith('/Volumes/') ? target.split(path.sep)[2] : path.basename(target);
+    const margin = Math.min(totalRequired * 0.05, 512 * 1024 * 1024);
+    return {
+      requiredBytes: totalRequired,
+      availableBytes: available,
+      hasEnoughSpace: available >= (totalRequired + margin),
+      destVolume: destVolume || path.basename(target)
+    };
+  } catch (error) {
+    return { requiredBytes: 0, availableBytes: 0, hasEnoughSpace: true, error: error.message };
+  }
 });
 handle('start-copy', (sourceDirs, destDir, description) => {
   validatePaths(sourceDirs, destDir);

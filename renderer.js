@@ -1791,12 +1791,31 @@ diskNoticesToggle.addEventListener('change', async () => {
 const mediaSeparationToggle = document.getElementById('media-separation');
 const soundAlertsToggle = document.getElementById('sound-alerts');
 const autoEjectToggle = document.getElementById('auto-eject');
+const telegramEnabledToggle = document.getElementById('telegram-enabled');
+const telegramConfigPanel = document.getElementById('telegram-config-panel');
+const telegramBotTokenInput = document.getElementById('telegram-bot-token');
+const telegramChatIdInput = document.getElementById('telegram-chat-id');
+const telegramDetectBtn = document.getElementById('telegram-detect-btn');
+const telegramTestBtn = document.getElementById('telegram-test-btn');
+const telegramStatusMsg = document.getElementById('telegram-status-msg');
 
 async function renderMediaSettings(settings) {
     if (!settings) return;
     if (mediaSeparationToggle) mediaSeparationToggle.checked = !!settings.mediaSeparation;
     if (soundAlertsToggle) soundAlertsToggle.checked = settings.soundAlerts !== false;
     if (autoEjectToggle) autoEjectToggle.checked = !!settings.autoEject;
+    if (telegramEnabledToggle) {
+        telegramEnabledToggle.checked = !!settings.telegramEnabled;
+        if (telegramConfigPanel) {
+            telegramConfigPanel.style.display = settings.telegramEnabled ? 'flex' : 'none';
+        }
+    }
+    if (telegramBotTokenInput && typeof settings.telegramBotToken === 'string') {
+        telegramBotTokenInput.value = settings.telegramBotToken;
+    }
+    if (telegramChatIdInput && typeof settings.telegramChatId === 'string') {
+        telegramChatIdInput.value = settings.telegramChatId;
+    }
 }
 
 window.electronAPI?.getMediaSettings?.().then(renderMediaSettings).catch(console.error);
@@ -1828,6 +1847,125 @@ if (autoEjectToggle) {
         } catch (error) {
             autoEjectToggle.checked = !autoEjectToggle.checked;
             showError(error.message);
+        }
+    });
+}
+if (telegramEnabledToggle) {
+    telegramEnabledToggle.addEventListener('change', async () => {
+        try {
+            if (telegramConfigPanel) {
+                telegramConfigPanel.style.display = telegramEnabledToggle.checked ? 'flex' : 'none';
+            }
+            await window.electronAPI?.setMediaSettings?.({ telegramEnabled: telegramEnabledToggle.checked });
+        } catch (error) {
+            telegramEnabledToggle.checked = !telegramEnabledToggle.checked;
+            if (telegramConfigPanel) {
+                telegramConfigPanel.style.display = telegramEnabledToggle.checked ? 'flex' : 'none';
+            }
+            showError(error.message);
+        }
+    });
+}
+
+function saveTelegramCredentials() {
+    const botToken = telegramBotTokenInput?.value?.trim() || '';
+    const chatId = telegramChatIdInput?.value?.trim() || '';
+    window.electronAPI?.setMediaSettings?.({
+        telegramBotToken: botToken,
+        telegramChatId: chatId
+    }).catch(console.error);
+}
+
+telegramBotTokenInput?.addEventListener('change', saveTelegramCredentials);
+telegramBotTokenInput?.addEventListener('blur', saveTelegramCredentials);
+telegramChatIdInput?.addEventListener('change', saveTelegramCredentials);
+telegramChatIdInput?.addEventListener('blur', saveTelegramCredentials);
+
+if (telegramDetectBtn) {
+    telegramDetectBtn.addEventListener('click', async () => {
+        const token = telegramBotTokenInput?.value?.trim();
+        if (!token) {
+            if (telegramStatusMsg) {
+                telegramStatusMsg.hidden = false;
+                telegramStatusMsg.textContent = 'Inserisci prima il Bot Token.';
+            }
+            telegramBotTokenInput?.focus();
+            return;
+        }
+        telegramDetectBtn.disabled = true;
+        if (telegramStatusMsg) {
+            telegramStatusMsg.hidden = false;
+            telegramStatusMsg.textContent = 'Ricerca messaggi recenti...';
+        }
+        try {
+            const res = await window.electronAPI?.detectTelegramChatId?.(token);
+            if (res && res.ok && res.chatId) {
+                if (telegramChatIdInput) telegramChatIdInput.value = res.chatId;
+                await window.electronAPI?.setMediaSettings?.({
+                    telegramBotToken: token,
+                    telegramChatId: res.chatId
+                });
+                if (telegramStatusMsg) {
+                    telegramStatusMsg.hidden = false;
+                    telegramStatusMsg.textContent = `✅ Chat trovata: ${res.title} (ID: ${res.chatId})`;
+                }
+            } else {
+                if (telegramStatusMsg) {
+                    telegramStatusMsg.hidden = false;
+                    telegramStatusMsg.textContent = `⚠️ ${res?.error || 'Nessun messaggio trovato'}`;
+                }
+            }
+        } catch (err) {
+            if (telegramStatusMsg) {
+                telegramStatusMsg.hidden = false;
+                telegramStatusMsg.textContent = `⚠️ ${err.message}`;
+            }
+        } finally {
+            telegramDetectBtn.disabled = false;
+        }
+    });
+}
+
+if (telegramTestBtn) {
+    telegramTestBtn.addEventListener('click', async () => {
+        const token = telegramBotTokenInput?.value?.trim();
+        const chatId = telegramChatIdInput?.value?.trim();
+        if (!token || !chatId) {
+            if (telegramStatusMsg) {
+                telegramStatusMsg.hidden = false;
+                telegramStatusMsg.textContent = 'Inserisci sia il Bot Token sia il Chat ID.';
+            }
+            return;
+        }
+        telegramTestBtn.disabled = true;
+        if (telegramStatusMsg) {
+            telegramStatusMsg.hidden = false;
+            telegramStatusMsg.textContent = 'Invio notifica in corso...';
+        }
+        try {
+            await window.electronAPI?.setMediaSettings?.({
+                telegramBotToken: token,
+                telegramChatId: chatId
+            });
+            const res = await window.electronAPI?.testTelegramNotification?.(token, chatId);
+            if (res && res.ok) {
+                if (telegramStatusMsg) {
+                    telegramStatusMsg.hidden = false;
+                    telegramStatusMsg.textContent = '✅ Notifica inviata con successo! Controlla Telegram.';
+                }
+            } else {
+                if (telegramStatusMsg) {
+                    telegramStatusMsg.hidden = false;
+                    telegramStatusMsg.textContent = `⚠️ ${res?.error || 'Errore invio'}`;
+                }
+            }
+        } catch (err) {
+            if (telegramStatusMsg) {
+                telegramStatusMsg.hidden = false;
+                telegramStatusMsg.textContent = `⚠️ ${err.message}`;
+            }
+        } finally {
+            telegramTestBtn.disabled = false;
         }
     });
 }

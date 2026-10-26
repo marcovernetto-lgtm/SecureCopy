@@ -222,6 +222,14 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 .settings-select { background: rgba(18,32,38,.85); color: #eaf3f5; border: 1px solid rgba(94,234,212,.25); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 500; min-width: 110px; cursor: pointer; }
 .settings-row .compact-btn { min-height: 30px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
 .settings-inline-status { font-size: 11px; color: #5eead4; padding: 6px 14px 10px; margin: 0; line-height: 1.4; }
+.settings-subgroup { padding: 12px 14px; background: rgba(0,0,0,.22); border-top: 1px solid rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 10px; }
+.settings-input-row { display: flex; flex-direction: column; gap: 4px; }
+.settings-input-label { font-size: 11px; font-weight: 600; color: #8fa7b0; text-transform: uppercase; letter-spacing: .5px; }
+.settings-input-text { background: rgba(18,32,38,.85); color: #eaf3f5; border: 1px solid rgba(94,234,212,.22); border-radius: 8px; padding: 7px 10px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; outline: none; transition: border-color .15s, box-shadow .15s; }
+.settings-input-text:focus { border-color: #5eead4; box-shadow: 0 0 0 2px rgba(94,234,212,.15); }
+.settings-input-actions { display: flex; gap: 8px; }
+.settings-input-actions .settings-input-text { flex: 1; min-width: 0; }
+.settings-row-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
 .settings-footer-card { margin-top: 18px; padding: 12px 14px; background: rgba(12,23,28,.7); border: 1px solid rgba(94,234,212,.15); border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .settings-brand-info { display: flex; flex-direction: column; gap: 2px; }
 .settings-app-name { font-size: 13px; font-weight: 700; color: #ffffff; letter-spacing: .3px; }

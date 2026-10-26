@@ -9,6 +9,12 @@ const { overlap, snapshot, matches } = require('./fs-safety');
 const { compareFolders, reconcileFolders, forRenderer, expandComparisonDecisions } = require('./compare-engine');
 const { createUpdater } = require('./updater');
 const { exportDITReportPDF } = require('./dit-report');
+const {
+  sendTelegramMessage,
+  detectTelegramChatId,
+  sendTestNotification,
+  formatCopyCompletionMessage
+} = require('./telegram-notify');
 
 let mainWindow;
 let backgroundService = null;
@@ -41,7 +47,10 @@ let retentionTimer = null;
 let mediaSettings = {
   mediaSeparation: false,
   soundAlerts: true,
-  autoEject: false
+  autoEject: false,
+  telegramEnabled: false,
+  telegramBotToken: '',
+  telegramChatId: ''
 };
 
 async function loadMediaSettings() {
@@ -51,6 +60,9 @@ async function loadMediaSettings() {
     if (typeof data.mediaSeparation === 'boolean') mediaSettings.mediaSeparation = data.mediaSeparation;
     if (typeof data.soundAlerts === 'boolean') mediaSettings.soundAlerts = data.soundAlerts;
     if (typeof data.autoEject === 'boolean') mediaSettings.autoEject = data.autoEject;
+    if (typeof data.telegramEnabled === 'boolean') mediaSettings.telegramEnabled = data.telegramEnabled;
+    if (typeof data.telegramBotToken === 'string') mediaSettings.telegramBotToken = data.telegramBotToken;
+    if (typeof data.telegramChatId === 'string') mediaSettings.telegramChatId = data.telegramChatId;
   } catch { /* defaults */ }
 }
 
@@ -58,6 +70,9 @@ async function saveMediaSettings(newSettings) {
   if (typeof newSettings.mediaSeparation === 'boolean') mediaSettings.mediaSeparation = newSettings.mediaSeparation;
   if (typeof newSettings.soundAlerts === 'boolean') mediaSettings.soundAlerts = newSettings.soundAlerts;
   if (typeof newSettings.autoEject === 'boolean') mediaSettings.autoEject = newSettings.autoEject;
+  if (typeof newSettings.telegramEnabled === 'boolean') mediaSettings.telegramEnabled = newSettings.telegramEnabled;
+  if (typeof newSettings.telegramBotToken === 'string') mediaSettings.telegramBotToken = newSettings.telegramBotToken;
+  if (typeof newSettings.telegramChatId === 'string') mediaSettings.telegramChatId = newSettings.telegramChatId;
   try {
     const file = path.join(app.getPath('userData'), 'media-settings.json');
     const temp = `${file}.${crypto.randomUUID()}.tmp`;
@@ -323,6 +338,8 @@ handle('recover-pending-copies', () => {
 handle('get-report-retention', () => reportRetentionDays);
 handle('get-media-settings', () => mediaSettings);
 handle('set-media-settings', async settings => saveMediaSettings(settings));
+handle('detect-telegram-chat-id', async token => detectTelegramChatId(token));
+handle('test-telegram-notification', async ({ botToken, chatId }) => sendTestNotification(botToken, chatId));
 handle('get-background-settings', () => backgroundService.getSettings());
 handle('set-login-startup', enabled => backgroundService.setLogin(enabled));
 handle('set-disk-notices', enabled => backgroundService.setDiskNotices(enabled));
@@ -571,6 +588,18 @@ async function finishJob(item, report) {
         });
       }
     }
+  }
+  if (mediaSettings.telegramEnabled && mediaSettings.telegramBotToken && mediaSettings.telegramChatId) {
+    const text = formatCopyCompletionMessage(item, report);
+    sendTelegramMessage(mediaSettings.telegramBotToken, mediaSettings.telegramChatId, text).then(res => {
+      if (res && res.ok) {
+        sendLog('INFO', 'Notifica Telegram inviata con successo.');
+      } else {
+        sendLog('WARNING', `Notifica Telegram non riuscita: ${res?.error || 'errore sconosciuto'}`);
+      }
+    }).catch(err => {
+      sendLog('WARNING', `Notifica Telegram fallita: ${err.message}`);
+    });
   }
   updateQueue();
   scheduleQueue();

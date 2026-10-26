@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getBackgroundSettings: () => ipcRenderer.invoke('get-background-settings'),
     getMediaSettings: () => ipcRenderer.invoke('get-media-settings'),
     setMediaSettings: (settings) => ipcRenderer.invoke('set-media-settings', settings),
+    detectTelegramChatId: (token) => ipcRenderer.invoke('detect-telegram-chat-id', token),
+    testTelegramNotification: (botToken, chatId) => ipcRenderer.invoke('test-telegram-notification', { botToken, chatId }),
     setLoginStartup: enabled => ipcRenderer.invoke('set-login-startup', enabled),
     setDiskNotices: enabled => ipcRenderer.invoke('set-disk-notices', enabled),
     onBackgroundSettingsUpdated: callback => ipcRenderer.on('background-settings-updated', (_event, settings) => callback(settings)),

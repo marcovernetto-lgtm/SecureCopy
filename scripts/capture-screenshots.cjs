@@ -103,7 +103,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     // 2. COPIA SICURA (Offload set-up for Videomakers / Photographers)
     await evaluate(`
-      switchScreen('setup');
+      showSetupScreen();
       sourcePaths = [
         '/Volumes/SONY_FX3_A01/CLIP/A001_C001_1026E8_001.MOV',
         '/Volumes/SONY_FX3_A01/CLIP/A001_C002_102641_001.MOV',

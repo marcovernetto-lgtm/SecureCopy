@@ -15,10 +15,16 @@
     'La modalità rapida include le sottocartelle, senza leggere i contenuti. Stessa dimensione e data non garantiscono contenuti identici.': 'Quick mode includes subfolders without reading contents. Matching size and date do not guarantee identical contents.',
     'Tutti sinistra → destra': 'All left → right',
     'Tutti destra → sinistra': 'All right → left',
+    'Tutti Sorgente → Destinazione': 'All source → destination',
+    'Tutti Destinazione → Sorgente': 'All destination → source',
     '→ Destra': '→ Right',
     '← Sinistra': '← Left',
+    '→ Destinazione': '→ Destination',
+    '← Sorgente': '← Source',
     'Manca a destra': 'Missing on right',
     'Manca a sinistra': 'Missing on left',
+    'Manca in destinazione': 'Missing in destination',
+    'Manca in sorgente': 'Missing in source',
     'Diverso': 'Different',
     'Corrispondente': 'Matching',
     'Dettagli': 'Details',
@@ -57,6 +63,8 @@
     'Invia notifica di prova': 'Send test notification',
     'Selezionati → destra': 'Selected → right',
     'Selezionati → sinistra': 'Selected → left',
+    'Selezionati → Destinazione': 'Selected → destination',
+    'Selezionati → Sorgente': 'Selected → source',
     'Opzioni di copia': 'Copy options',
     'Controllo sorgente…': 'Checking source…',
     'Verifica SHA-256…': 'Verifying SHA-256…',
@@ -65,6 +73,10 @@
     'Esiti aggiornati per i file scelti; gli altri risalgono all’ultima analisi.': 'Results updated for selected files; other results are from the last analysis.',
     'Versioni sinistra': 'Left versions',
     'Versioni destra': 'Right versions',
+    'Versioni sorgente': 'Source versions',
+    'Versioni destinazione': 'Destination versions',
+    'Mantieni sorgente': 'Keep source',
+    'Mantieni destinazione': 'Keep destination',
     'Nessuna versione precedente disponibile.': 'No previous version available.',
     'Escludi nomi': 'Exclude names',
     'Nomi esclusi dal confronto': 'Names excluded from comparison',
@@ -318,10 +330,10 @@
     if ((match = value.match(/^Destinazione \(Drag\): (.*)$/))) return `Destination (drag): ${match[1]}`;
     if ((match = value.match(/^1 cartella selezionata: (.*)$/))) return `1 folder selected: ${match[1]}`;
     if ((match = value.match(/^SecureCopy · Versione (.*)$/))) return `SecureCopy · Version ${match[1]}`;
-    if ((match = value.match(/^(Analisi|Controllo preliminare|Verifica finale): censimento cartella (sinistra|destra) · (\d+) elementi trovati · (.*)$/)))
-      return `${{Analisi:'Analysis','Controllo preliminare':'Pre-check','Verifica finale':'Final verification'}[match[1]]}: scanning ${match[2] === 'sinistra' ? 'left' : 'right'} folder · ${match[3]} items found · ${match[4]}`;
-    if ((match = value.match(/^(Analisi|Controllo preliminare|Verifica finale) cartella (sinistra|destra): (\d+)\/(\d+) elementi( · .* letti)? · (.*)$/)))
-      return `${{Analisi:'Analysis','Controllo preliminare':'Pre-check','Verifica finale':'Final verification'}[match[1]]} ${match[2] === 'sinistra' ? 'left' : 'right'} folder: ${match[3]}/${match[4]} items${match[5] ? match[5].replace(' di ', ' of ').replace(' letti', ' read') : ''} · ${match[6]}`;
+    if ((match = value.match(/^(Analisi|Controllo preliminare|Verifica finale): censimento (?:cartella )?(sinistra|destra|sorgente|destinazione) · (\d+) elementi trovati · (.*)$/)))
+      return `${{Analisi:'Analysis','Controllo preliminare':'Pre-check','Verifica finale':'Final verification'}[match[1]]}: scanning ${(match[2] === 'sinistra' || match[2] === 'sorgente') ? 'source' : 'destination'} · ${match[3]} items found · ${match[4]}`;
+    if ((match = value.match(/^(Analisi|Controllo preliminare|Verifica finale) (?:cartella )?(sinistra|destra|sorgente|destinazione): (\d+)\/(\d+) elementi( · .* letti)? · (.*)$/)))
+      return `${{Analisi:'Analysis','Controllo preliminare':'Pre-check','Verifica finale':'Final verification'}[match[1]]} ${(match[2] === 'sinistra' || match[2] === 'sorgente') ? 'source' : 'destination'}: ${match[3]}/${match[4]} items${match[5] ? match[5].replace(' di ', ' of ').replace(' letti', ' read') : ''} · ${match[6]}`;
     if ((match = value.match(/^Sorgente: (.*)$/))) return `Source: ${translateItalian(match[1])}`;
     if ((match = value.match(/^Destinazione aggiunta: (.*)$/))) return `Destination added: ${match[1]}`;
     if ((match = value.match(/^Avvio: (.*)$/))) return `Started: ${translateItalian(match[1])}`;

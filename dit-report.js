@@ -960,6 +960,31 @@ ${pagesHTML}
 </html>`;
 }
 
+function getReportSuffix(index) {
+  if (index === 0) return '';
+  let num = index - 1;
+  let suffix = '';
+  while (num >= 0) {
+    suffix = String.fromCharCode(65 + (num % 26)) + suffix;
+    num = Math.floor(num / 26) - 1;
+  }
+  return `_${suffix}`;
+}
+
+function resolveUniqueReportPdfPath(targetDir, sourceName) {
+  const cleanSource = (sourceName || 'Sorgente').replace(/[/\\:*?"<>|]/g, '-').trim() || 'Sorgente';
+  const baseName = `SecureCopy Report-${cleanSource}`;
+  let index = 0;
+  while (true) {
+    const candidate = `${baseName}${getReportSuffix(index)}.pdf`;
+    const fullPath = path.join(targetDir, candidate);
+    if (!fs.existsSync(fullPath)) {
+      return { filename: candidate, fullPath };
+    }
+    index++;
+  }
+}
+
 async function exportDITReportPDF(reportData, BrowserWindow, shell, reportsDirectory) {
   if (!reportData || !Array.isArray(reportData.files)) {
     throw new Error('Dati del report non validi per l’esportazione DIT.');
@@ -1022,28 +1047,45 @@ async function exportDITReportPDF(reportData, BrowserWindow, shell, reportsDirec
       }
     });
 
-    const reportId = reportData.id || require('crypto').randomUUID();
-    const pdfFileName = `SecureCopy-Manifest-DIT-${reportId}.pdf`;
+    let sourceName = '';
+    if (Array.isArray(reportData.sourceDirs) && reportData.sourceDirs.length > 0) {
+      if (reportData.sourceDirs.length === 1) {
+        sourceName = path.basename(reportData.sourceDirs[0]);
+      } else {
+        sourceName = reportData.sourceDirs.map(s => path.basename(s)).filter(Boolean).join('_');
+      }
+    } else if (typeof reportData.source === 'string' && reportData.source) {
+      sourceName = path.basename(reportData.source);
+    } else if (typeof reportData.destination === 'string' && reportData.destination) {
+      sourceName = path.basename(reportData.destination);
+    }
+    if (!sourceName || sourceName === '/' || sourceName === '.') {
+      sourceName = 'Sorgente';
+    }
+
     const targetDir = reportsDirectory || path.join(require('os').tmpdir(), 'securecopy-reports');
     await fsp.mkdir(targetDir, { recursive: true });
-    const pdfPath = path.join(targetDir, pdfFileName);
-    await fsp.writeFile(pdfPath, pdfBuffer);
+    const internalReport = resolveUniqueReportPdfPath(targetDir, sourceName);
+    await fsp.writeFile(internalReport.fullPath, pdfBuffer);
+
+    let chosenPath = internalReport.fullPath;
 
     // Also copy to destination directory if accessible
     if (destinationRoot && fs.existsSync(destinationRoot)) {
       try {
-        const destPdfPath = path.join(destinationRoot, `SecureCopy-Manifest-DIT.pdf`);
-        await fsp.writeFile(destPdfPath, pdfBuffer);
+        const destReport = resolveUniqueReportPdfPath(destinationRoot, sourceName);
+        await fsp.writeFile(destReport.fullPath, pdfBuffer);
+        chosenPath = destReport.fullPath;
       } catch {
         // Destination might be read-only; non-fatal
       }
     }
 
     if (shell && typeof shell.openPath === 'function') {
-      await shell.openPath(pdfPath);
+      await shell.openPath(chosenPath);
     }
 
-    return { success: true, pdfPath, totalFiles: reportData.files.length };
+    return { success: true, pdfPath: chosenPath, totalFiles: reportData.files.length };
   } finally {
     win.close();
   }
@@ -1056,5 +1098,7 @@ module.exports = {
   friendlyCodec,
   probeMediaFile,
   generateDITReportHTML,
-  exportDITReportPDF
+  exportDITReportPDF,
+  getReportSuffix,
+  resolveUniqueReportPdfPath
 };

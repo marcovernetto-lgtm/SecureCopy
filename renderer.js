@@ -229,8 +229,10 @@ function renderComparisonProgress(item) {
         resultSummary.classList.remove('hidden');
     } else resultSummary.classList.add('hidden');
     failureDetails?.classList.add('hidden');
-    openReportBtn.classList.toggle('hidden', !item.reportId);
+    openReportBtn?.classList.toggle('hidden', !item.reportId);
     document.getElementById('export-dit-report-btn')?.classList.toggle('hidden', !item.reportId || item.kind === 'compare');
+    if (newCopyBtn) newCopyBtn.classList.remove('hidden');
+    if (item.result) renderJobResult(item.result);
 }
 function updateTransferFlowUI(item) {
     if (!flowCard) return;
@@ -240,8 +242,8 @@ function updateTransferFlowUI(item) {
     }
     flowCard.classList.remove('hidden');
     if (item.kind === 'compare') {
-        const leftBase = item.leftRoot ? item.leftRoot.split(/[/\\]/).filter(Boolean).pop() || item.leftRoot : 'Sinistra';
-        const rightBase = item.rightRoot ? item.rightRoot.split(/[/\\]/).filter(Boolean).pop() || item.rightRoot : 'Destra';
+        const leftBase = item.leftRoot ? item.leftRoot.split(/[/\\]/).filter(Boolean).pop() || item.leftRoot : 'Sorgente';
+        const rightBase = item.rightRoot ? item.rightRoot.split(/[/\\]/).filter(Boolean).pop() || item.rightRoot : 'Destinazione';
         if (flowSourceName) flowSourceName.textContent = leftBase;
         if (flowSourcePath) { flowSourcePath.textContent = item.leftRoot || ''; flowSourcePath.title = item.leftRoot || ''; }
         if (flowDestName) flowDestName.textContent = rightBase;
@@ -494,6 +496,7 @@ function renderSources() {
     sourcePathEl.textContent = sourcePaths.length
         ? `${sourcePaths.length} ${sourcePaths.length === 1 ? 'elemento selezionato' : 'elementi selezionati'}`
         : 'Nessuna sorgente selezionata';
+    sourcePathEl.closest('.selection-card')?.classList.toggle('has-selection', sourcePaths.length > 0);
     sourceList.replaceChildren();
     for (const source of sourcePaths) {
         const chip = document.createElement('div');
@@ -514,8 +517,11 @@ function renderSources() {
     }
 }
 function renderDestinations() {
-    if (destPathEl) destPathEl.textContent = destPaths.length
-        ? `${destPaths.length} ${destPaths.length === 1 ? 'destinazione selezionata' : 'destinazioni selezionate'}` : 'Nessuna destinazione selezionata';
+    if (destPathEl) {
+        destPathEl.textContent = destPaths.length
+            ? `${destPaths.length} ${destPaths.length === 1 ? 'destinazione selezionata' : 'destinazioni selezionate'}` : 'Nessuna destinazione selezionata';
+        destPathEl.closest('.selection-card')?.classList.toggle('has-selection', destPaths.length > 0);
+    }
     if (!destList) return;
     destList.replaceChildren();
     destPaths.forEach(dest => {
@@ -1172,6 +1178,8 @@ function startNewComparison() {
     compareLeft = ''; compareRight = '';
     compareLeftPath.textContent = compareRightPath.textContent = 'Nessuna cartella selezionata';
     compareLeftPath.title = compareRightPath.title = '';
+    compareLeftBtn?.closest('.compare-picker')?.classList.remove('has-selection');
+    compareRightBtn?.closest('.compare-picker')?.classList.remove('has-selection');
     compareFilter.value = '';
     document.getElementById('compare-status-filter').value = 'all';
     document.getElementById('compare-show-identical').checked = false;
@@ -1248,7 +1256,9 @@ function resetComparisonAfterSelection() {
     compareFinishedFiles.clear();
     compareCopyErrors.clear();
     compareList.replaceChildren();
-    compareReportBtn.classList.add('hidden');
+    compareReportBtn?.classList.add('hidden');
+    compareLeftBtn?.closest('.compare-picker')?.classList.toggle('has-selection', Boolean(compareLeft));
+    compareRightBtn?.closest('.compare-picker')?.classList.toggle('has-selection', Boolean(compareRight));
     renderCompareVerdict();
     compareProgressEl.textContent = compareLeft && compareRight
         ? 'Cartelle pronte. Premi Avvia analisi cartelle.'
@@ -1305,7 +1315,7 @@ function makeCompareRow(entry) {
     name.append(filename);
     const label = document.createElement('span');
     label.className = 'compare-details';
-    label.textContent = compareCopyErrors.has(entry.relative) ? 'Copia da controllare · apri Dettagli' : entry.verified ? 'Copiato e verificato' : entry.created ? 'Cartella creata' : entry.status === 'missing' ? (entry.leftExists ? 'Manca a destra' : 'Manca a sinistra') : entry.status === 'different' ? 'Diverso' : 'Corrispondente';
+    label.textContent = compareCopyErrors.has(entry.relative) ? 'Copia da controllare · apri Dettagli' : entry.verified ? 'Copiato e verificato' : entry.created ? 'Cartella creata' : entry.status === 'missing' ? (entry.leftExists ? 'Manca in Destinazione' : 'Manca in Sorgente') : entry.status === 'different' ? 'Diverso' : 'Corrispondente';
     if (compareCopyErrors.has(entry.relative)) label.classList.add('copy-warning');
     name.append(label);
     const details = document.createElement('details');
@@ -1315,7 +1325,7 @@ function makeCompareRow(entry) {
     const info = document.createElement('p');
     info.textContent = [compareCopyErrors.get(entry.relative), ...(entry.warnings || []), ...entry.issues].filter(Boolean).join(' · ') || 'Nessuna differenza rilevata';
     details.append(info);
-    for (const [side, data] of [['Sinistra', entry.leftDetails], ['Destra', entry.rightDetails]]) {
+    for (const [side, data] of [['Sorgente', entry.leftDetails], ['Destinazione', entry.rightDetails]]) {
         if (!data) continue;
         const paragraph = document.createElement('p');
         paragraph.textContent = `${side}: ${data.type} · ${data.size == null ? '—' : formatBytes(data.size)} · ${data.modified == null ? '—' : new Date(data.modified).toLocaleString()}${data.sha256 ? ` · SHA-256: ${data.sha256}` : ''}`;
@@ -1325,7 +1335,7 @@ function makeCompareRow(entry) {
         if (!exists) continue;
         const versions = document.createElement('button');
         versions.className = 'button secondary';
-        versions.textContent = side === 'left' ? 'Versioni sinistra' : 'Versioni destra';
+        versions.textContent = side === 'left' ? 'Versioni sorgente' : 'Versioni destinazione';
         versions.addEventListener('click', async () => {
             try { if (!await window.electronAPI.openVersions(entry.relative, side)) showError('Nessuna versione precedente disponibile.'); }
             catch (error) { showError(error.message); }
@@ -1345,13 +1355,13 @@ function makeCompareRow(entry) {
     const action = document.createElement('div');
     action.className = 'compare-row-actions';
     if (entry.status !== 'identical' && entry.copyable) {
-        for (const [keep, exists, text] of [['left', entry.leftExists, '→ Destra'], ['right', entry.rightExists, '← Sinistra']]) {
+        for (const [keep, exists, text] of [['left', entry.leftExists, '→ Destinazione'], ['right', entry.rightExists, '← Sorgente']]) {
             if (!exists) continue;
             const button = document.createElement('button');
             button.className = 'button secondary';
             button.textContent = text;
             button.disabled = compareBusy || comparePreparing;
-            button.title = `Copia ${entry.relative} ${keep === 'left' ? 'da sinistra a destra' : 'da destra a sinistra'}`;
+            button.title = `Copia ${entry.relative} ${keep === 'left' ? 'da sorgente a destinazione' : 'da destinazione a sorgente'}`;
             button.addEventListener('click', () => runComparisonCopy([{ relative: entry.relative, keep }], true));
             action.append(button);
         }
@@ -1409,7 +1419,7 @@ async function analyzeComparison() {
     compareFileProgress.clear();
     compareFinishedFiles.clear();
     compareCopyErrors.clear();
-    compareReportBtn.classList.add('hidden');
+    compareReportBtn?.classList.add('hidden');
     compareProgressEl.textContent = 'Censimento delle cartelle in corso…';
     setCompareProgress(null, true);
     compareList.replaceChildren();
@@ -1422,7 +1432,7 @@ async function analyzeComparison() {
         compareVisibleCount = 300;
         renderCompareVerdict();
         renderCompareList();
-        compareReportBtn.classList.toggle('hidden', !compareResult.reportPath);
+        compareReportBtn?.classList.toggle('hidden', !compareResult.reportPath);
     } catch (error) {
         compareProgressEl.textContent = cleanOperationError(error.message);
         showError(cleanOperationError(error.message));
@@ -1477,7 +1487,7 @@ function confirmComparisonCopy({ decisions, bytes, policyMessage, preview, engli
             if (!count) continue;
             const row = document.createElement('div');
             row.className = 'copy-confirmation-direction';
-            row.textContent = `${from === 'left' ? (english ? 'Left → Right' : 'Sinistra → Destra') : (english ? 'Right → Left' : 'Destra → Sinistra')} · ${count} ${english ? 'items' : 'elementi'}`;
+            row.textContent = `${from === 'left' ? (english ? 'Source → Destination' : 'Sorgente → Destinazione') : (english ? 'Destination → Source' : 'Destinazione → Sorgente')} · ${count} ${english ? 'items' : 'elementi'}`;
             dialog.append(row);
         }
         const policy = document.createElement('p');
@@ -1489,7 +1499,7 @@ function confirmComparisonCopy({ decisions, bytes, policyMessage, preview, engli
         details.append(label);
         for (const item of preview || []) {
             const row = document.createElement('p');
-            row.textContent = `${item.side === 'left' ? (english ? 'Left' : 'Sinistra') : (english ? 'Right' : 'Destra')} · ${item.volume}: ${formatBytes(item.bytes)} ${english ? 'required' : 'necessari'} / ${formatBytes(item.available)} ${english ? 'available' : 'disponibili'}`;
+            row.textContent = `${item.side === 'left' ? (english ? 'Source' : 'Sorgente') : (english ? 'Destination' : 'Destinazione')} · ${item.volume}: ${formatBytes(item.bytes)} ${english ? 'required' : 'necessari'} / ${formatBytes(item.available)} ${english ? 'available' : 'disponibili'}`;
             details.append(row);
         }
         if (preview?.length) dialog.append(details);
@@ -1577,7 +1587,7 @@ async function runComparisonCopy(decisions = [], selectedOnly = false) {
         const remaining = result.summary.missing + result.summary.different;
         compareProgressEl.textContent = `${result.status === 'cancelled' ? 'Copia annullata · ' : ''}${result.copied.length} file copiati e verificati · ${result.failures.length} errori · ${remaining} elementi ancora da verificare.`;
         setCompareProgress(100);
-        compareReportBtn.classList.toggle('hidden', !result.reportPath);
+        compareReportBtn?.classList.toggle('hidden', !result.reportPath);
     } catch (error) {
         compareProgressEl.textContent = cleanOperationError(error.message);
         showError(cleanOperationError(error.message));
@@ -1595,16 +1605,16 @@ compareReportBtn?.addEventListener('click', () => {
 });
 if (window.electronAPI) window.electronAPI.onCompareProgress(data => {
     if (!compareBusy) return;
-    const side = data.side === 'left' ? 'sinistra' : 'destra';
+    const side = data.side === 'left' ? 'sorgente' : 'destinazione';
     const stage = data.step === 'precheck' ? 'Controllo preliminare' :
         data.step === 'verify' ? 'Verifica finale' : 'Analisi';
     if (data.phase === 'inventory') {
         setCompareProgress(data.percentage ?? null, data.percentage == null);
-        compareProgressEl.textContent = `${stage}: censimento cartella ${side} · ${data.count} elementi trovati · ${data.current || ''}`;
+        compareProgressEl.textContent = `${stage}: censimento ${side} · ${data.count} elementi trovati · ${data.current || ''}`;
     } else if (data.phase === 'analyze') {
         setCompareProgress(data.percentage);
         const read = data.totalBytes ? ` · ${formatBytes(data.processedBytes)} di ${formatBytes(data.totalBytes)} letti` : '';
-        compareProgressEl.textContent = `${stage} cartella ${side}: ${data.processedItems}/${data.totalItems} elementi${read} · ${data.current || ''}`;
+        compareProgressEl.textContent = `${stage} ${side}: ${data.processedItems}/${data.totalItems} elementi${read} · ${data.current || ''}`;
     } else if (data.phase === 'file-copy') {
         if (compareFinishedFiles.has(data.current)) return;
         compareFileProgress.set(data.current, data);

@@ -913,7 +913,7 @@ handle('preview-comparison', async (decisions, policy) => {
     const root = side==='left'?compareSession.leftRoot:compareSession.rightRoot;
     const stats = await fs.promises.statfs(root);
     const available = stats.bavail * stats.bsize;
-    if (available < required[side]) throw new Error(`Spazio insufficiente nella cartella ${side==='left'?'sinistra':'destra'}.`);
+    if (available < required[side]) throw new Error(`Spazio insufficiente in ${side==='left'?'sorgente':'destinazione'}.`);
     const parts = root.split(path.sep);
     result.push({side, volume:parts[1]==='Volumes'?parts[2]:path.parse(root).root, available, bytes:required[side]});
   }
@@ -986,9 +986,9 @@ handle('compare-context-menu', relative => {
   const left = compareSession.left.get(relative);
   const right = compareSession.right.get(relative);
   const template = [];
-  if (left) template.push({ label: uiLanguage === 'en' ? 'Show left file in Finder' : 'Mostra nella cartella sinistra nel Finder',
+  if (left) template.push({ label: uiLanguage === 'en' ? 'Show source file in Finder' : 'Mostra file sorgente nel Finder',
     click: () => shell.showItemInFolder(left.path) });
-  if (right) template.push({ label: uiLanguage === 'en' ? 'Show right file in Finder' : 'Mostra nella cartella destra nel Finder',
+  if (right) template.push({ label: uiLanguage === 'en' ? 'Show destination file in Finder' : 'Mostra file destinazione nel Finder',
     click: () => shell.showItemInFolder(right.path) });
   if (!template.length) return false;
   Menu.buildFromTemplate(template).popup({ window: mainWindow });

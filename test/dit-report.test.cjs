@@ -8,7 +8,9 @@ const {
   formatTimestamp,
   friendlyCodec,
   probeMediaFile,
-  generateDITReportHTML
+  generateDITReportHTML,
+  getReportSuffix,
+  resolveUniqueReportPdfPath
 } = require('../dit-report');
 
 test('formatBytes handles small, large, and zero byte values accurately', () => {
@@ -158,4 +160,46 @@ test('generateDITReportHTML filters non-media files and paginates multi-page rep
   assert.ok(html.includes('PAGINA 1 DI 2'));
   assert.ok(html.includes('PAGINA 2 DI 2'));
   assert.ok(html.includes('subsequent-header'));
+});
+
+test('getReportSuffix produces correct letter suffixes', () => {
+  assert.equal(getReportSuffix(0), '');
+  assert.equal(getReportSuffix(1), '_A');
+  assert.equal(getReportSuffix(2), '_B');
+  assert.equal(getReportSuffix(3), '_C');
+  assert.equal(getReportSuffix(26), '_Z');
+  assert.equal(getReportSuffix(27), '_AA');
+  assert.equal(getReportSuffix(28), '_AB');
+});
+
+test('resolveUniqueReportPdfPath names reports and increments _A _B _C when file exists', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-report-naming-'));
+  try {
+    const sourceName = 'CARD_01';
+    
+    // First report: base name
+    const report1 = resolveUniqueReportPdfPath(tmpDir, sourceName);
+    assert.equal(report1.filename, 'SecureCopy Report-CARD_01.pdf');
+    await fs.writeFile(report1.fullPath, 'fake-pdf-content');
+
+    // Second report with same source: _A
+    const report2 = resolveUniqueReportPdfPath(tmpDir, sourceName);
+    assert.equal(report2.filename, 'SecureCopy Report-CARD_01_A.pdf');
+    await fs.writeFile(report2.fullPath, 'fake-pdf-content');
+
+    // Third report: _B
+    const report3 = resolveUniqueReportPdfPath(tmpDir, sourceName);
+    assert.equal(report3.filename, 'SecureCopy Report-CARD_01_B.pdf');
+    await fs.writeFile(report3.fullPath, 'fake-pdf-content');
+
+    // Fourth report: _C
+    const report4 = resolveUniqueReportPdfPath(tmpDir, sourceName);
+    assert.equal(report4.filename, 'SecureCopy Report-CARD_01_C.pdf');
+
+    // Different source folder starts without suffix
+    const reportOther = resolveUniqueReportPdfPath(tmpDir, 'CARD_02');
+    assert.equal(reportOther.filename, 'SecureCopy Report-CARD_02.pdf');
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
 });

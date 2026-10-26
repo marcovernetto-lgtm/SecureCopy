@@ -230,7 +230,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         <div class="compare-row missing" data-presence="left">
           <div class="compare-name"><strong>A001_C004_1026N3_001.MOV</strong><span class="compare-details">8.34 GB · Presente solo nella sorgente</span></div>
           <span class="compare-side">✓</span><span class="compare-side">-</span>
-          <button class="button picker-button" style="padding:4px 8px;font-size:11px;">Copia → Destra</button>
+          <button class="button picker-button" style="padding:4px 8px;font-size:11px;">→ Destinazione</button>
         </div>
         <div class="compare-row different" data-presence="both">
           <div class="compare-name"><strong>LUT/Creative_FilmLook.cube</strong><span class="compare-details">1.2 MB · Metadati o data di modifica aggiornata</span></div>

@@ -112,7 +112,7 @@ function publicEntry(relative, left, right) {
   if (!left || !right) {
     const existing = left || right;
     return {
-      relative, status: 'missing', issues: [left ? 'manca nella cartella destra' : 'manca nella cartella sinistra'],
+      relative, status: 'missing', issues: [left ? 'manca in destinazione' : 'manca in sorgente'],
       leftExists: !!left, rightExists: !!right,
       leftType: left?.type || null, rightType: right?.type || null,
       copyable: existing.type === 'file' || existing.type === 'directory'
@@ -327,7 +327,7 @@ async function reconcileFolders(session, decisions, { signal, onProgress, select
       const before = found.get(item.relative);
       const now = await statOrNull(path.join(root, item.relative));
       if (!matches(before?.stats ? snapshot(before.stats) : null, snapshot(now), before?.type === 'directory')) {
-        throw new Error(`Il file «${item.relative}» nella cartella ${root === session.leftRoot ? 'sinistra' : 'destra'} è cambiato dopo l’analisi. Nessun file è stato copiato. Esegui di nuovo il confronto.`);
+        throw new Error(`Il file «${item.relative}» in ${root === session.leftRoot ? 'sorgente' : 'destinazione'} è cambiato dopo l’analisi. Nessun file è stato copiato. Esegui di nuovo il confronto.`);
       }
       let parent = path.dirname(item.relative);
       while (parent !== '.') {

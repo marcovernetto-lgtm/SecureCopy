@@ -148,6 +148,7 @@
     'Cartella sinistra': 'Left folder',
     'Cartella destra': 'Right folder',
     'Nessuna cartella scelta': 'No folder selected',
+    '1 cartella selezionata': '1 folder selected',
     'Scegli cartella': 'Choose folder',
     'Avvia analisi cartelle': 'Compare folders',
     'Annulla analisi': 'Cancel analysis',

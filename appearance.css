@@ -352,7 +352,7 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 .selection-card, .compare-setup-panel .compare-picker {
   padding: 24px; gap: 18px; min-height: var(--picker-height); height: var(--picker-height);
 }
-.compare-setup-panel .compare-picker p { flex: 1; margin: 0; }
+.compare-setup-panel .compare-picker p { margin: 0; }
 .compare-setup-panel .compare-picker .selection-heading { min-height: 36px; }
 .selection-content { min-height: 0; }
 .copy-actions { padding-top: 0; }

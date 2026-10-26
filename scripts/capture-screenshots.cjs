@@ -194,15 +194,23 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await fs.writeFile(path.join(outDir, '03-operazioni-live.png'), Buffer.from(snap.data, 'base64'));
     console.log('✓ 03-operazioni-live.png catturato');
 
-    // 4. CONFRONTA CARTELLE (Folder Comparison & Difference Analysis)
+    // 4. CONFRONTA CARTELLE (Folder Comparison Setup & Difference Analysis)
     await evaluate(`(() => {
       switchScreen('compare');
+      setCompareStage('setup');
       compareLeft = '/Volumes/SONY_FX3_A01/CLIP';
       compareRight = '/Volumes/RAID_MASTER/PROGETTO_CINEMA_2026/GIORNO_01';
-      document.getElementById('compare-left-path').textContent = compareLeft;
-      document.getElementById('compare-right-path').textContent = compareRight;
+      renderCompareSelections();
+      resetComparisonAfterSelection();
+    })()`);
+    await delay(500);
+    snap = await command('Page.captureScreenshot', { format: 'png' });
+    await fs.writeFile(path.join(outDir, '04-confronta-cartelle-setup.png'), Buffer.from(snap.data, 'base64'));
+    console.log('✓ 04-confronta-cartelle-setup.png catturato');
 
+    await evaluate(`(() => {
       // Show results panel
+      setCompareStage('results');
       document.getElementById('compare-setup-panel').hidden = true;
       const resPanel = document.getElementById('compare-results-panel');
       resPanel.hidden = false;

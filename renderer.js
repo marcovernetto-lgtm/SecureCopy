@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSources();
     renderDestinations();
     updateStartButtonState();
+    renderCompareSelections();
     updateCompareActions();
     showHomeScreen();
 });
@@ -1130,6 +1131,8 @@ const compareLeftBtn = document.getElementById('compare-left-btn');
 const compareRightBtn = document.getElementById('compare-right-btn');
 const compareLeftPath = document.getElementById('compare-left-path');
 const compareRightPath = document.getElementById('compare-right-path');
+const compareLeftList = document.getElementById('compare-left-list');
+const compareRightList = document.getElementById('compare-right-list');
 const compareAnalyzeBtn = document.getElementById('compare-analyze-btn');
 const compareActions = document.querySelector('.compare-actions');
 const compareReconcileBtn = document.getElementById('compare-reconcile-btn');
@@ -1165,6 +1168,66 @@ const compareCopyErrors = new Map();
 let compareLiveSummary = null;
 let compareEntryIndex = new Map();
 
+function renderCompareSelections() {
+    if (compareLeftPath) {
+        compareLeftPath.textContent = compareLeft ? '1 cartella selezionata' : 'Nessuna cartella scelta';
+        compareLeftPath.title = compareLeft || '';
+    }
+    const leftPicker = compareLeftBtn?.closest('.compare-picker');
+    leftPicker?.classList.toggle('has-selection', Boolean(compareLeft));
+
+    if (compareLeftList) {
+        compareLeftList.replaceChildren();
+        if (compareLeft) {
+            const chip = document.createElement('div');
+            chip.className = 'path-chip';
+            chip.title = compareLeft;
+            const label = document.createElement('span');
+            label.textContent = compareLeft;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', `Rimuovi ${compareLeft}`);
+            remove.addEventListener('click', () => {
+                compareLeft = '';
+                renderCompareSelections();
+                resetComparisonAfterSelection();
+            });
+            chip.append(label, remove);
+            compareLeftList.append(chip);
+        }
+    }
+
+    if (compareRightPath) {
+        compareRightPath.textContent = compareRight ? '1 cartella selezionata' : 'Nessuna cartella scelta';
+        compareRightPath.title = compareRight || '';
+    }
+    const rightPicker = compareRightBtn?.closest('.compare-picker');
+    rightPicker?.classList.toggle('has-selection', Boolean(compareRight));
+
+    if (compareRightList) {
+        compareRightList.replaceChildren();
+        if (compareRight) {
+            const chip = document.createElement('div');
+            chip.className = 'path-chip destination-chip';
+            chip.title = compareRight;
+            const label = document.createElement('span');
+            label.textContent = compareRight;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', `Rimuovi ${compareRight}`);
+            remove.addEventListener('click', () => {
+                compareRight = '';
+                renderCompareSelections();
+                resetComparisonAfterSelection();
+            });
+            chip.append(label, remove);
+            compareRightList.append(chip);
+        }
+    }
+}
+
 function showCompareScreen() {
     if (currentScreen !== 'compare' && !compareBusy && !comparePreparing && compareResult) {
         startNewComparison();
@@ -1176,10 +1239,7 @@ function showCompareScreen() {
 function startNewComparison() {
     if (compareBusy || comparePreparing) return;
     compareLeft = ''; compareRight = '';
-    compareLeftPath.textContent = compareRightPath.textContent = 'Nessuna cartella selezionata';
-    compareLeftPath.title = compareRightPath.title = '';
-    compareLeftBtn?.closest('.compare-picker')?.classList.remove('has-selection');
-    compareRightBtn?.closest('.compare-picker')?.classList.remove('has-selection');
+    renderCompareSelections();
     compareFilter.value = '';
     document.getElementById('compare-status-filter').value = 'all';
     document.getElementById('compare-show-identical').checked = false;
@@ -1448,18 +1508,70 @@ compareLeftBtn?.addEventListener('click', async () => {
     const selected = await window.electronAPI.selectFolder();
     if (!selected) return;
     compareLeft = selected;
-    compareLeftPath.textContent = selected;
-    compareLeftPath.title = selected;
+    renderCompareSelections();
     resetComparisonAfterSelection();
 });
 compareRightBtn?.addEventListener('click', async () => {
     const selected = await window.electronAPI.selectFolder();
     if (!selected) return;
     compareRight = selected;
-    compareRightPath.textContent = selected;
-    compareRightPath.title = selected;
+    renderCompareSelections();
     resetComparisonAfterSelection();
 });
+
+if (compareLeftBtn) {
+    const leftZone = compareLeftBtn.closest('.compare-picker') || compareLeftBtn.parentElement;
+    leftZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        leftZone.classList.add('drag-over');
+    });
+    leftZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        leftZone.classList.remove('drag-over');
+    });
+    leftZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        leftZone.classList.remove('drag-over');
+        const entries = Array.from(e.dataTransfer.items || []).map(item => item.webkitGetAsEntry?.()).filter(Boolean);
+        if (entries.some(entry => !entry.isDirectory)) {
+            logMessage({ message: 'La sorgente di confronto deve essere una cartella.', className: 'text-orange-400' });
+            return;
+        }
+        const files = Array.from(e.dataTransfer.files).map(f => window.electronAPI.getPathForFile(f)).filter(Boolean);
+        if (files.length > 0) {
+            compareLeft = files[0];
+            renderCompareSelections();
+            resetComparisonAfterSelection();
+        }
+    });
+}
+
+if (compareRightBtn) {
+    const rightZone = compareRightBtn.closest('.compare-picker') || compareRightBtn.parentElement;
+    rightZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        rightZone.classList.add('drag-over');
+    });
+    rightZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        rightZone.classList.remove('drag-over');
+    });
+    rightZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        rightZone.classList.remove('drag-over');
+        const entries = Array.from(e.dataTransfer.items || []).map(item => item.webkitGetAsEntry?.()).filter(Boolean);
+        if (entries.some(entry => !entry.isDirectory)) {
+            logMessage({ message: 'La destinazione di confronto deve essere una cartella.', className: 'text-orange-400' });
+            return;
+        }
+        const files = Array.from(e.dataTransfer.files).map(f => window.electronAPI.getPathForFile(f)).filter(Boolean);
+        if (files.length > 0) {
+            compareRight = files[0];
+            renderCompareSelections();
+            resetComparisonAfterSelection();
+        }
+    });
+}
 compareAnalyzeBtn?.addEventListener('click', analyzeComparison);
 compareContinueBtn.addEventListener('click', analyzeComparison);
 compareCancelBtn?.addEventListener('click', () => window.electronAPI.cancelCompare());
@@ -1738,8 +1850,7 @@ document.getElementById('compare-recover').addEventListener('click', async () =>
     const recovery = comparisonRecovery;
     compareLeft = recovery.leftRoot;
     compareRight = recovery.rightRoot;
-    compareLeftPath.textContent = compareLeft;
-    compareRightPath.textContent = compareRight;
+    renderCompareSelections();
     document.getElementById('compare-mode').value = recovery.mode;
     document.getElementById('compare-exclusions').value = (recovery.exclusions || []).join(', ');
     document.getElementById('compare-copy-policy').value = recovery.policy || 'replace';

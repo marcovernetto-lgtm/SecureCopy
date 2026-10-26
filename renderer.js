@@ -570,7 +570,10 @@ function switchScreen(view) {
     updateNavigation();
     updateAnimation();
 }
-function showHomeScreen() { switchScreen('home'); }
+function showHomeScreen() {
+    switchScreen('home');
+    window.electronAPI?.getPendingCopyRecoveryCount?.().then(updateCopyRecoveryUI).catch(console.error);
+}
 function showMonitorScreen() {
     const active = operations.find(item => ['processing','pausing','paused'].includes(item.status));
     if (active && !operations.some(item => item.id === focusedJobId && ['processing','pausing','paused'].includes(item.status))) focusedJobId = active.id;
@@ -581,6 +584,7 @@ function showMonitorScreen() {
 }
 function showSetupScreen() {
     switchScreen('copy');
+    window.electronAPI?.getPendingCopyRecoveryCount?.().then(updateCopyRecoveryUI).catch(console.error);
 }
 function updateNavigation() {
     const active = copyQueue.filter(item => ['processing', 'pausing', 'paused'].includes(item.status));
@@ -760,16 +764,88 @@ function initializeQueueDisplay() {
     }
     updateQueueDisplay();
 }
+const recoverCopyWrap = document.getElementById('recover-copy-wrap');
 const recoverCopyQueueBtn = document.getElementById('recover-copy-queue');
-window.electronAPI?.getPendingCopyRecoveryCount?.().then(count => { recoverCopyQueueBtn.hidden = !count; }).catch(console.error);
-recoverCopyQueueBtn.addEventListener('click', async () => {
-    recoverCopyQueueBtn.disabled = true;
+const dismissCopyRecoveryBtn = document.getElementById('dismiss-copy-recovery');
+const recoverCopyText = document.getElementById('recover-copy-text');
+
+const homeRecoverCopyWrap = document.getElementById('home-recover-copy-wrap');
+const homeRecoverCopyBtn = document.getElementById('home-recover-copy-btn');
+const homeDismissCopyRecoveryBtn = document.getElementById('home-dismiss-copy-recovery');
+const homeRecoverCopyText = document.getElementById('home-recover-copy-text');
+
+let pendingCopyCount = 0;
+
+function updateCopyRecoveryUI(count) {
+    pendingCopyCount = Number(count) || 0;
+    const hasPending = pendingCopyCount > 0;
+    const label = pendingCopyCount > 1 ? `${pendingCopyCount} copie interrotte in sospeso` : 'Copia interrotta in sospeso';
+    const btnLabel = pendingCopyCount > 1 ? `Riprendi ${pendingCopyCount} copie` : 'Riprendi copia';
+
+    if (recoverCopyWrap) {
+        recoverCopyWrap.hidden = !hasPending;
+        recoverCopyWrap.classList.toggle('hidden', !hasPending);
+    }
+    if (recoverCopyQueueBtn) {
+        recoverCopyQueueBtn.hidden = !hasPending;
+        recoverCopyQueueBtn.textContent = btnLabel;
+    }
+    if (recoverCopyText) {
+        recoverCopyText.textContent = label;
+    }
+
+    if (homeRecoverCopyWrap) {
+        homeRecoverCopyWrap.hidden = !hasPending;
+        homeRecoverCopyWrap.classList.toggle('hidden', !hasPending);
+    }
+    if (homeRecoverCopyBtn) {
+        homeRecoverCopyBtn.textContent = btnLabel;
+    }
+    if (homeRecoverCopyText) {
+        homeRecoverCopyText.textContent = label;
+    }
+}
+
+async function handleRecoverCopies() {
+    if (recoverCopyQueueBtn) recoverCopyQueueBtn.disabled = true;
+    if (homeRecoverCopyBtn) homeRecoverCopyBtn.disabled = true;
     try {
         await window.electronAPI.recoverPendingCopies();
-        recoverCopyQueueBtn.hidden = true;
-    } catch (error) { showError(error.message); }
-    finally { recoverCopyQueueBtn.disabled = false; }
-});
+        await window.electronAPI.startQueue();
+        updateCopyRecoveryUI(0);
+        showMonitorScreen();
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        if (recoverCopyQueueBtn) recoverCopyQueueBtn.disabled = false;
+        if (homeRecoverCopyBtn) homeRecoverCopyBtn.disabled = false;
+    }
+}
+
+async function handleDismissCopies() {
+    if (dismissCopyRecoveryBtn) dismissCopyRecoveryBtn.disabled = true;
+    if (homeDismissCopyRecoveryBtn) homeDismissCopyRecoveryBtn.disabled = true;
+    try {
+        await window.electronAPI.dismissPendingCopies();
+        updateCopyRecoveryUI(0);
+        logMessage({ message: 'Copia interrotta eliminata (non verrà ripresa).', className: 'text-slate-400' });
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        if (dismissCopyRecoveryBtn) dismissCopyRecoveryBtn.disabled = false;
+        if (homeDismissCopyRecoveryBtn) homeDismissCopyRecoveryBtn.disabled = false;
+    }
+}
+
+if (recoverCopyQueueBtn) recoverCopyQueueBtn.addEventListener('click', handleRecoverCopies);
+if (homeRecoverCopyBtn) homeRecoverCopyBtn.addEventListener('click', handleRecoverCopies);
+if (dismissCopyRecoveryBtn) dismissCopyRecoveryBtn.addEventListener('click', handleDismissCopies);
+if (homeDismissCopyRecoveryBtn) homeDismissCopyRecoveryBtn.addEventListener('click', handleDismissCopies);
+
+window.electronAPI?.getPendingCopyRecoveryCount?.().then(updateCopyRecoveryUI).catch(console.error);
+if (window.electronAPI?.onPendingCopyRecoveryUpdated) {
+    window.electronAPI.onPendingCopyRecoveryUpdated(updateCopyRecoveryUI);
+}
 
 const headerContainer = document.getElementById('data-flow-track');
 function initializeParticles() {
@@ -2053,7 +2129,14 @@ let comparisonRecovery = null;
 let comparisonRecoveryRevision = 0;
 function updateComparisonRecovery(recovery) {
     comparisonRecovery = recovery;
-    document.getElementById('compare-recover').hidden = !recovery?.decisions?.length;
+    const hasRecovery = Boolean(recovery?.decisions?.length);
+    const recoverBtn = document.getElementById('compare-recover');
+    const recoverWrap = document.getElementById('compare-recover-wrap');
+    if (recoverBtn) recoverBtn.hidden = !hasRecovery;
+    if (recoverWrap) {
+        recoverWrap.hidden = !hasRecovery;
+        recoverWrap.classList.toggle('hidden', !hasRecovery);
+    }
 }
 if (window.electronAPI?.onComparisonRecoveryUpdated) window.electronAPI.onComparisonRecoveryUpdated(recovery => {
     comparisonRecoveryRevision++;
@@ -2064,6 +2147,22 @@ if (window.electronAPI?.getComparisonRecovery) {
     window.electronAPI.getComparisonRecovery().then(recovery => {
         if (revision === comparisonRecoveryRevision) updateComparisonRecovery(recovery);
     }).catch(error => console.error(error));
+}
+
+const dismissCompareRecoveryBtn = document.getElementById('dismiss-compare-recovery');
+if (dismissCompareRecoveryBtn) {
+    dismissCompareRecoveryBtn.addEventListener('click', async () => {
+        dismissCompareRecoveryBtn.disabled = true;
+        try {
+            await window.electronAPI.dismissComparisonRecovery();
+            updateComparisonRecovery(null);
+            logMessage({ message: 'Confronto interrotto eliminato.', className: 'text-slate-400' });
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            dismissCompareRecoveryBtn.disabled = false;
+        }
+    });
 }
 document.getElementById('compare-recover').addEventListener('click', async () => {
     if (!comparisonRecovery || compareBusy || comparePreparing) return;

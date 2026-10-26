@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     getPendingCopyRecoveryCount: () => ipcRenderer.invoke('get-pending-copy-recovery-count'),
     recoverPendingCopies: () => ipcRenderer.invoke('recover-pending-copies'),
+    dismissPendingCopies: () => ipcRenderer.invoke('dismiss-pending-copies'),
+    onPendingCopyRecoveryUpdated: callback => ipcRenderer.on('pending-copy-recovery-updated', (_event, count) => callback(count)),
     retryCopy: id => ipcRenderer.invoke('retry-copy', id),
     startCopy: (sourcePaths, destPath, description) => ipcRenderer.invoke('start-copy', sourcePaths, destPath, description),
     startBatch: (sourcePaths, destPaths, mode, policy) => ipcRenderer.invoke('start-batch', sourcePaths, destPaths, mode, policy),
@@ -34,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     reconcileFolders: (decisions, selectedOnly, policy) => ipcRenderer.invoke('reconcile-folders', decisions, selectedOnly, policy),
     openVersions: (relative, side) => ipcRenderer.invoke('open-versions', relative, side),
     getComparisonRecovery: () => ipcRenderer.invoke('get-comparison-recovery'),
+    dismissComparisonRecovery: () => ipcRenderer.invoke('dismiss-comparison-recovery'),
     onComparisonRecoveryUpdated: callback => ipcRenderer.on('comparison-recovery-updated', (_event, recovery) => callback(recovery)),
     previewComparison: (decisions, policy) => ipcRenderer.invoke('preview-comparison', decisions, policy),
     pauseComparison: paused => ipcRenderer.invoke('pause-comparison', paused),

@@ -109,6 +109,9 @@ function availableComparisonRecovery() {
 function publishComparisonRecovery() {
   send('comparison-recovery-updated', availableComparisonRecovery());
 }
+function publishPendingCopyRecovery() {
+  send('pending-copy-recovery-updated', pendingCopyRecovery.length);
+}
 function saveComparisonRecovery(force = false) {
   if (!recoveryStore) return;
   if (!force && Date.now() - lastRecoveryWrite < 500) return;
@@ -125,6 +128,10 @@ function saveQueue() {
   if (!queueStore) return;
   const pending = pendingCopyRecovery.concat(copyQueue.filter(item => item.status === 'pending')).concat([...activeJobs.values()].map(job => ({ ...job.item, recovered: true })))
     .map(item => ({ ...item, progress: 0, filesProcessed: 0 }));
+  if (pending.length === 0) {
+    try { fs.rmSync(queueStore, { force: true }); } catch {}
+    return;
+  }
   const temp = `${queueStore}.tmp`;
   try {
     fs.writeFileSync(temp, JSON.stringify(pending), { mode: 0o600 });
@@ -154,6 +161,8 @@ function restoreQueue() {
   } catch (error) {
     if (error.code !== 'ENOENT') console.error('Impossibile ripristinare la coda:', error);
   }
+  publishPendingCopyRecovery();
+  publishComparisonRecovery();
 }
 async function applyReportRetention() {
   if (retentionTask) return retentionTask;
@@ -348,6 +357,25 @@ handle('recover-pending-copies', () => {
   copyQueue.push(...pendingCopyRecovery);
   pendingCopyRecovery = [];
   updateQueue();
+  publishPendingCopyRecovery();
+  return count;
+});
+handle('dismiss-pending-copies', () => {
+  const count = pendingCopyRecovery.length;
+  pendingCopyRecovery = [];
+  if (queueStore) {
+    try {
+      if (copyQueue.some(item => item.status === 'pending') || activeJobs.size > 0) {
+        saveQueue();
+      } else {
+        fs.rmSync(queueStore, { force: true });
+      }
+    } catch (err) {
+      sendLog('WARNING', `Impossibile cancellare copie in sospeso: ${err.message}`);
+    }
+  }
+  updateQueue();
+  publishPendingCopyRecovery();
   return count;
 });
 handle('get-report-retention', () => reportRetentionDays);
@@ -908,6 +936,18 @@ handle('compare-folders', async (leftRoot, rightRoot, mode = 'quick', exclusions
   }
 });
 handle('get-comparison-recovery', availableComparisonRecovery);
+handle('dismiss-comparison-recovery', () => {
+  comparisonRecovery = null;
+  if (recoveryStore) {
+    try {
+      fs.rmSync(recoveryStore, { force: true });
+    } catch (err) {
+      sendLog('WARNING', `Impossibile rimuovere ripresa confronto: ${err.message}`);
+    }
+  }
+  publishComparisonRecovery();
+  return true;
+});
 handle('pause-comparison', paused => {
   if (!compareController || comparisonItem.operation !== 'reconcile') return false;
   comparisonItem.paused = paused === true;

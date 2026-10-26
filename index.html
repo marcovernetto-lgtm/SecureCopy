@@ -55,11 +55,153 @@
 <section id="compare-screen" class="screen compare-screen" style="display:none" hidden aria-labelledby="compare-title">
 <header class="page-heading"><div><button id="compare-back-btn" class="back-link"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12H4m6-6-6 6 6 6"/></svg> <span id="compare-back-label">Panoramica</span></button><h1 id="compare-title">Scegli le cartelle</h1><p class="page-description compare-setup-description">Scegli le due cartelle da confrontare.</p></div><button id="new-comparison-btn" class="button secondary" hidden>Nuovo confronto</button></header>
 <div id="compare-setup-panel" class="compare-setup-panel"><button id="compare-recover" class="button secondary" hidden>Riprendi confronto interrotto</button><div class="compare-picker-grid"><div class="compare-picker glass-panel"><div class="selection-heading"><span class="selection-icon"><svg class="folder-vector-icon" viewBox="0 0 32 32" width="32" height="32" fill="none" aria-hidden="true"><path d="M4 8.5a2 2 0 0 1 2-2h6.5l2.2 2.5h11.8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" fill="#3c5b70"/><path d="M3.5 12h24a1.8 1.8 0 0 1 1.8 2l-1.4 11.5a2.2 2.2 0 0 1-2.2 2H5.3a2.2 2.2 0 0 1-2.2-2L1.7 14a1.8 1.8 0 0 1 1.8-2Z" fill="url(#folder-blue-front)"/><path d="M5 13.5h21" stroke="#d1edff" stroke-opacity="0.6" stroke-width="1.2" stroke-linecap="round"/><circle cx="15" cy="18.5" r="3.2" stroke="#ffffff" stroke-width="1.5"/><path d="m17.5 21 2.5 2.5" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/></svg></span><h2>Sorgente</h2></div><div class="selection-content"><p id="compare-left-path" class="selection-summary">Nessuna cartella scelta</p><div id="compare-left-list" class="path-list"></div></div><button id="compare-left-btn" class="button picker-button">Scegli cartella</button></div><div class="compare-picker glass-panel"><div class="selection-heading"><span class="selection-icon destination-icon"><svg class="folder-vector-icon" viewBox="0 0 32 32" width="32" height="32" fill="none" aria-hidden="true"><path d="M4 8.5a2 2 0 0 1 2-2h6.5l2.2 2.5h11.8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" fill="#356c5c"/><path d="M3.5 12h24a1.8 1.8 0 0 1 1.8 2l-1.4 11.5a2.2 2.2 0 0 1-2.2 2H5.3a2.2 2.2 0 0 1-2.2-2L1.7 14a1.8 1.8 0 0 1 1.8-2Z" fill="url(#folder-green-front)"/><path d="M5 13.5h21" stroke="#d8f2e7" stroke-opacity="0.6" stroke-width="1.2" stroke-linecap="round"/><path d="M12.5 18h7m-2-2.2 2.2 2.2-2.2 2.2m-5 0-2.2-2.2 2.2-2.2" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2>Destinazione</h2></div><div class="selection-content"><p id="compare-right-path" class="selection-summary">Nessuna cartella scelta</p><div id="compare-right-list" class="path-list"></div></div><button id="compare-right-btn" class="button picker-button">Scegli cartella</button></div></div>
-<details class="compare-advanced"><summary>Opzioni di analisi</summary><label>Escludi nomi <input id="compare-exclusions" type="text" placeholder="*.tmp, cache" aria-label="Nomi esclusi dal confronto"></label><label>Analisi <select id="compare-mode"><option value="quick">Rapida · dimensione e data</option><option value="deep">Completa · SHA-256 e metadati</option></select></label><p>La modalità rapida include le sottocartelle, senza leggere i contenuti. Stessa dimensione e data non garantiscono contenuti identici.</p></details><button id="compare-continue-btn" class="button primary" disabled>Avvia confronto</button></div><div id="compare-results-panel" class="compare-results-panel" hidden><div class="compare-primary-action"><button id="compare-analyze-btn" class="button primary" disabled>Avvia analisi cartelle</button><button id="compare-cancel-btn" class="button danger" hidden>Annulla analisi</button></div>
-<div class="compare-progress-wrap"><div class="compare-progress-line"><p id="compare-progress" role="status">Seleziona due cartelle per iniziare.</p><strong id="compare-percentage">—</strong></div><div id="compare-progress-track" class="progress-track" role="progressbar" aria-label="Avanzamento analisi"><div id="compare-progress-bar"></div></div></div>
-<div id="compare-verdict" class="compare-verdict hidden" role="status" aria-live="polite"></div><div class="compare-actions" hidden><button id="compare-reconcile-btn" class="button primary" disabled>Copia e verifica i file mancanti</button><button id="compare-bulk-left" class="button secondary">Tutti Sorgente → Destinazione</button><button id="compare-bulk-right" class="button secondary">Tutti Destinazione → Sorgente</button></div>
-<div class="compare-table"><div class="compare-table-heading"><span>File</span><span>Sorgente</span><span>Destinazione</span><span>Azione</span></div><div id="compare-list" class="compare-list" aria-label="Risultati del confronto"></div></div><div class="compare-results-toolbar"><select id="compare-status-filter" aria-label="Tipo di risultato"><option value="all">Tutti i risultati</option><option value="missing">Mancanti</option><option value="different">Diversi</option><option value="verified">Verificati</option><option value="errors">Errori</option></select><input id="compare-filter" type="search" placeholder="Cerca nei risultati" aria-label="Filtra risultati"><div class="compare-legend"><span><i class="dot different"></i>Da verificare</span><span><i class="dot missing"></i>Mancante</span></div></div>
-<div id="compare-selection-actions" class="compare-selection-actions" hidden><span id="compare-selection-count"></span><button id="compare-clear-selection" class="button secondary">Deseleziona</button><button id="compare-selected-left" class="button secondary">Selezionati → Destinazione</button><button id="compare-selected-right" class="button secondary">Selezionati → Sorgente</button></div><details class="compare-advanced compare-result-options"><summary>Dettagli</summary><p id="compare-operation-errors" role="status" hidden></p><button id="compare-select-visible" class="button secondary">Seleziona visibili</button><label>File diversi <select id="compare-copy-policy"><option value="replace">Sostituisci e conserva la versione precedente</option><option value="both">Conserva entrambi</option><option value="skip">Salta</option></select></label><button id="compare-retry" class="button secondary" hidden>Riprova i falliti</button><button id="compare-resume" class="button secondary" hidden>Riprendi i rimanenti</button><button id="compare-pause" class="button secondary" hidden>Pausa dopo il file</button><label><input id="compare-show-identical" type="checkbox"> Mostra anche i corrispondenti</label></details><p class="compare-hint">Clic destro su un risultato per mostrarlo nel Finder.</p>
+<details class="compare-advanced"><summary>Opzioni di analisi</summary><label>Escludi nomi <input id="compare-exclusions" type="text" placeholder="*.tmp, cache" aria-label="Nomi esclusi dal confronto"></label><label>Analisi <select id="compare-mode"><option value="quick">Rapida · dimensione e data</option><option value="deep">Completa · SHA-256 e metadati</option></select></label><p>La modalità rapida include le sottocartelle, senza leggere i contenuti. Stessa dimensione e data non garantiscono contenuti identici.</p></details><button id="compare-continue-btn" class="button primary" disabled>Avvia confronto</button></div>
+<div id="compare-results-panel" class="compare-results-panel" hidden>
+  <div class="compare-primary-action hidden">
+    <button id="compare-analyze-btn" class="button secondary compact-btn" disabled>Avvia analisi cartelle</button>
+    <button id="compare-cancel-btn" class="button danger" hidden>Annulla analisi</button>
+  </div>
+  <div class="compare-progress-wrap">
+    <div class="compare-progress-line">
+      <p id="compare-progress" role="status">Seleziona due cartelle per iniziare.</p>
+      <strong id="compare-percentage">—</strong>
+    </div>
+    <div id="compare-progress-track" class="progress-track" role="progressbar" aria-label="Avanzamento analisi">
+      <div id="compare-progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- Visual Results Dashboard: Status Banner + Integrity Gauge + Proportional Graph + Metric Cards -->
+  <div id="compare-results-dashboard" class="compare-dashboard glass-panel hidden">
+    <div class="dashboard-header">
+      <div class="dashboard-status-main">
+        <span id="compare-verdict-icon" class="status-indicator-icon">✓</span>
+        <div>
+          <h2 id="compare-verdict-title">Tutti i file sono presenti sul disco</h2>
+          <p id="compare-verdict-subtitle">4 verificati corrispondenti · Integrità garantita</p>
+        </div>
+      </div>
+      <div class="coverage-gauge">
+        <span id="compare-coverage-pct" class="gauge-value">100%</span>
+        <span class="gauge-label">Presenza su disco</span>
+      </div>
+    </div>
+
+    <div class="distribution-graph-wrap">
+      <div class="distribution-bar" id="compare-distribution-bar" role="progressbar" aria-label="Ripartizione stato file">
+        <div id="dist-seg-identical" class="dist-seg seg-identical" style="width:0%" title="Identici"></div>
+        <div id="dist-seg-relocated" class="dist-seg seg-relocated" style="width:0%" title="In altra posizione"></div>
+        <div id="dist-seg-different" class="dist-seg seg-different" style="width:0%" title="Diversi"></div>
+        <div id="dist-seg-missing" class="dist-seg seg-missing" style="width:0%" title="Mancanti"></div>
+      </div>
+    </div>
+
+    <div class="compare-metrics-grid">
+      <button type="button" class="metric-card active" data-filter="all" id="card-filter-all">
+        <div class="metric-top">
+          <div class="metric-dot dot-all"></div>
+          <span class="metric-title">Tutti i file</span>
+        </div>
+        <div class="metric-bottom">
+          <strong class="metric-val" id="count-all">0</strong>
+          <span class="metric-bytes" id="bytes-all">0 B</span>
+        </div>
+      </button>
+
+      <button type="button" class="metric-card" data-filter="verified" id="card-filter-verified">
+        <div class="metric-top">
+          <div class="metric-dot dot-identical"></div>
+          <span class="metric-title">Identici</span>
+        </div>
+        <div class="metric-bottom">
+          <strong class="metric-val" id="count-identical">0</strong>
+          <span class="metric-bytes" id="bytes-identical">0 B</span>
+        </div>
+      </button>
+
+      <button type="button" class="metric-card" data-filter="relocated" id="card-filter-relocated">
+        <div class="metric-top">
+          <div class="metric-dot dot-relocated"></div>
+          <span class="metric-title">Altra posizione</span>
+        </div>
+        <div class="metric-bottom">
+          <strong class="metric-val" id="count-relocated">0</strong>
+          <span class="metric-bytes" id="bytes-relocated">0 B</span>
+        </div>
+      </button>
+
+      <button type="button" class="metric-card" data-filter="missing" id="card-filter-missing">
+        <div class="metric-top">
+          <div class="metric-dot dot-missing"></div>
+          <span class="metric-title">Mancanti</span>
+        </div>
+        <div class="metric-bottom">
+          <strong class="metric-val" id="count-missing">0</strong>
+          <span class="metric-bytes" id="bytes-missing">0 B</span>
+        </div>
+      </button>
+
+      <button type="button" class="metric-card" data-filter="different" id="card-filter-different">
+        <div class="metric-top">
+          <div class="metric-dot dot-different"></div>
+          <span class="metric-title">Diversi</span>
+        </div>
+        <div class="metric-bottom">
+          <strong class="metric-val" id="count-different">0</strong>
+          <span class="metric-bytes" id="bytes-different">0 B</span>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <div id="compare-verdict" class="compare-verdict hidden" role="status" aria-live="polite"></div>
+
+  <!-- Unified, Clear Action Bar -->
+  <div class="compare-actions" hidden>
+    <button id="compare-reconcile-btn" class="button primary compare-primary-sync" disabled>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;margin-right:6px"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      <span id="compare-reconcile-label">Copia e verifica i file mancanti</span>
+    </button>
+    <button id="compare-bulk-right" class="button secondary compare-reverse-sync" hidden>Sincronizza verso Sorgente</button>
+    <button id="compare-bulk-left" class="button secondary hidden" style="display:none"></button>
+    <div class="compare-search-box">
+      <input id="compare-filter" type="search" placeholder="Cerca file o cartella…" aria-label="Filtra risultati">
+      <select id="compare-status-filter" aria-label="Tipo di risultato" class="hidden" style="display:none">
+        <option value="all">Tutti</option>
+        <option value="missing">Mancanti</option>
+        <option value="relocated">Altra posizione</option>
+        <option value="different">Diversi</option>
+        <option value="verified">Identici</option>
+        <option value="errors">Errori</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="compare-selection-actions" class="compare-selection-actions" hidden>
+    <span id="compare-selection-count"></span>
+    <button id="compare-clear-selection" class="button secondary compact-btn">Deseleziona</button>
+    <button id="compare-selected-left" class="button primary compact-btn">Copia selezionati → Destinazione</button>
+    <button id="compare-selected-right" class="button secondary compact-btn">Copia selezionati → Sorgente</button>
+  </div>
+
+  <div class="compare-table">
+    <div class="compare-table-heading">
+      <span>File</span><span>Sorgente</span><span>Destinazione</span><span>Stato e Azione</span>
+    </div>
+    <div id="compare-list" class="compare-list" aria-label="Risultati del confronto"></div>
+  </div>
+
+  <details class="compare-advanced compare-result-options">
+    <summary>Dettagli</summary>
+    <p id="compare-operation-errors" role="status" hidden></p>
+    <button id="compare-select-visible" class="button secondary compact-btn">Seleziona visibili</button>
+    <label>File diversi <select id="compare-copy-policy"><option value="replace">Sostituisci e conserva la versione precedente</option><option value="both">Conserva entrambi</option><option value="skip">Salta</option></select></label>
+    <button id="compare-retry" class="button secondary compact-btn" hidden>Riprova i falliti</button>
+    <button id="compare-resume" class="button secondary compact-btn" hidden>Riprendi i rimanenti</button>
+    <button id="compare-pause" class="button secondary compact-btn" hidden>Pausa dopo il file</button>
+    <label><input id="compare-show-identical" type="checkbox" checked> Mostra anche i corrispondenti</label>
+  </details>
+  <p class="compare-hint">Clic destro su un risultato per mostrarlo nel Finder.</p>
 </div></section></div></div>
 <div id="credits-box" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="credits-title"><div class="modal-card settings-card"><div class="settings-header"><h2 id="credits-title">Impostazioni</h2><button id="credits-close" class="modal-close" aria-label="Chiudi impostazioni">×</button></div><div class="settings-scroll-body"><div class="settings-grid"><div class="settings-column"><div class="settings-group-header"><span class="settings-group-title">Copia e Dischi</span></div><div class="settings-group"><label class="settings-row switch-field"><span class="settings-label">Separa Video, RAW e JPEG</span><input id="media-separation" type="checkbox" role="switch"></label><label class="settings-row switch-field"><span class="settings-label">Avviso sonoro a fine copia</span><input id="sound-alerts" type="checkbox" role="switch"></label><label class="settings-row switch-field"><span class="settings-label">Espulsione automatica disco</span><input id="auto-eject" type="checkbox" role="switch"></label><label class="settings-row switch-field"><span class="settings-label">Rilevamento supporti</span><input id="disk-notices" type="checkbox" role="switch"></label></div></div><div class="settings-column"><div class="settings-group-header"><span class="settings-group-title">Sistema e Preferenze</span></div><div class="settings-group"><label class="settings-row switch-field"><span class="settings-label">Avvia all’accesso</span><input id="login-startup" type="checkbox" role="switch"></label><p id="login-startup-status" class="settings-inline-status" hidden></p><div class="settings-row"><span class="settings-label">Lingua</span><select id="language-select" class="settings-select"><option value="it">Italiano</option><option value="en">English</option></select></div><div class="settings-row"><span class="settings-label">Conservazione report</span><span id="report-retention" class="settings-badge">20 giorni</span></div><div class="settings-row"><span class="settings-label">Aggiornamenti</span><button id="check-updates-btn" class="button secondary compact-btn">Verifica ora</button></div><p id="update-check-status" class="settings-inline-status" hidden></p></div></div></div><div class="settings-full-group"><div class="settings-group-header"><span class="settings-group-title">Notifiche Telegram</span></div><div class="settings-group"><label class="settings-row switch-field"><span class="settings-label">Notifica a fine copia</span><input id="telegram-enabled" type="checkbox" role="switch"></label><div id="telegram-config-panel" class="settings-subgroup" style="display:none"><div class="telegram-guide-box"><div class="telegram-guide-header"><span class="telegram-guide-icon">💡</span><strong>Guida configurazione in 3 passi:</strong></div><ol class="telegram-guide-steps"><li><span class="guide-num">1</span><div>Apri Telegram, cerca <a href="https://t.me/BotFather" target="_blank" class="guide-link">@BotFather</a> e digita <code>/newbot</code>. Copia il <b>Token</b> generato.</div></li><li><span class="guide-num">2</span><div>Cerca il tuo bot su Telegram e premi <b>Avvia</b> (o inviagli un messaggio).</div></li><li><span class="guide-num">3</span><div>Incolla il token qui sotto, premi <b>Rileva ID</b> e fai un <b>Test</b>.</div></li></ol></div><div class="telegram-inputs-grid"><div class="settings-input-row"><label for="telegram-bot-token" class="settings-input-label">Bot Token</label><input id="telegram-bot-token" type="password" class="settings-input-text" placeholder="123456789:ABCdefGhI..." autocomplete="off" spellcheck="false"></div><div class="settings-input-row"><label for="telegram-chat-id" class="settings-input-label">Chat ID</label><div class="settings-input-actions"><input id="telegram-chat-id" type="text" class="settings-input-text" placeholder="ID utente o gruppo" autocomplete="off" spellcheck="false"><button id="telegram-detect-btn" class="button secondary compact-btn" type="button" title="Rileva automaticamente l'ID inviando un messaggio al bot">Rileva ID</button></div></div></div><div class="telegram-panel-footer"><p id="telegram-status-msg" class="settings-inline-status" hidden></p><button id="telegram-test-btn" class="button secondary compact-btn" type="button" style="margin-left:auto">Invia notifica di prova</button></div></div></div></div><div class="settings-footer-card settings-about"><div class="settings-brand-info"><strong class="settings-app-name" id="about-app-version">SecureCopy</strong><span class="settings-brand-sub">powered by unshapedstudio</span></div><a href="https://buymeacoffee.com/vemarcus" target="_blank" class="coffee-support-btn"><span class="coffee-cup">☕</span><span>Offrimi un caffè</span></a></div></div></div></div>
 <div id="error-overlay" class="modal-overlay error-overlay" role="alertdialog" aria-modal="true" aria-labelledby="error-title"><div class="modal-card"><h2 id="error-title">Operazione non riuscita</h2><p id="error-message"></p><button id="error-retry-btn" class="button primary">Chiudi</button></div></div><script src="appearance.js"></script><script src="i18n.js"></script><script src="renderer.js"></script></body></html>

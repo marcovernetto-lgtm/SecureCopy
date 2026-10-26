@@ -209,46 +209,25 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     console.log('✓ 04-confronta-cartelle-setup.png catturato');
 
     await evaluate(`(() => {
-      // Show results panel
+      // Show results panel with realistic comparison data
       setCompareStage('results');
-      document.getElementById('compare-setup-panel').hidden = true;
-      const resPanel = document.getElementById('compare-results-panel');
-      resPanel.hidden = false;
-      document.getElementById('compare-progress').textContent = 'Analisi completata · 4 verificati corrispondenti, 1 mancante';
-      document.getElementById('compare-percentage').textContent = '100%';
-      document.getElementById('compare-progress-bar').style.width = '100%';
-
-      const list = document.getElementById('compare-list');
-      list.innerHTML = \`
-        <div class="compare-row identical" data-presence="both">
-          <div class="compare-name"><strong>A001_C001_1026E8_001.MOV</strong><span class="compare-details">6.42 GB · SHA-256 identico · Creazione identica</span></div>
-          <span class="compare-side">✓</span><span class="compare-side">✓</span>
-          <span class="compare-side">Verificato</span>
-        </div>
-        <div class="compare-row identical" data-presence="both">
-          <div class="compare-name"><strong>A001_C002_102641_001.MOV</strong><span class="compare-details">5.81 GB · SHA-256 identico · Creazione identica</span></div>
-          <span class="compare-side">✓</span><span class="compare-side">✓</span>
-          <span class="compare-side">Verificato</span>
-        </div>
-        <div class="compare-row identical" data-presence="both">
-          <div class="compare-name"><strong>A001_C003_102692_001.MOV</strong><span class="compare-details">7.15 GB · SHA-256 identico · Creazione identica</span></div>
-          <span class="compare-side">✓</span><span class="compare-side">✓</span>
-          <span class="compare-side">Verificato</span>
-        </div>
-        <div class="compare-row missing" data-presence="left">
-          <div class="compare-name"><strong>A001_C004_1026N3_001.MOV</strong><span class="compare-details">8.34 GB · Presente solo nella sorgente</span></div>
-          <span class="compare-side">✓</span><span class="compare-side">-</span>
-          <button class="button picker-button" style="padding:4px 8px;font-size:11px;">→ Destinazione</button>
-        </div>
-        <div class="compare-row different" data-presence="both">
-          <div class="compare-name"><strong>LUT/Creative_FilmLook.cube</strong><span class="compare-details">1.2 MB · Metadati o data di modifica aggiornata</span></div>
-          <span class="compare-side">✓</span><span class="compare-side">✓</span>
-          <button class="button picker-button" style="padding:4px 8px;font-size:11px;">Aggiorna</button>
-        </div>
-      \`;
-      document.querySelector('.compare-actions').hidden = false;
-      document.getElementById('compare-reconcile-btn').disabled = false;
-      document.getElementById('new-comparison-btn').hidden = false;
+      compareResult = {
+        mode: 'deep',
+        summary: { total: 6, identical: 3, relocated: 1, different: 1, missing: 1, errors: 0 },
+        entries: [
+          { relative: 'A001_C001_1026E8_001.MOV', status: 'identical', leftExists: true, rightExists: true, leftType: 'file', rightType: 'file', leftDetails: { size: 6891000000, modified: Date.now() }, rightDetails: { size: 6891000000, modified: Date.now() }, copyable: false, issues: [] },
+          { relative: 'A001_C002_102641_001.MOV', status: 'identical', leftExists: true, rightExists: true, leftType: 'file', rightType: 'file', leftDetails: { size: 6241000000, modified: Date.now() }, rightDetails: { size: 6241000000, modified: Date.now() }, copyable: false, issues: [] },
+          { relative: 'CARD_A/A001_C003_102692_001.MOV', status: 'relocated', relocatedPath: 'ARCHIVE/A001_C003_102692_001.MOV', relocatedSide: 'right', leftExists: true, rightExists: false, leftType: 'file', leftDetails: { size: 7680000000, modified: Date.now() }, copyable: false, issues: [] },
+          { relative: 'A001_C004_1026N3_001.MOV', status: 'missing', leftExists: true, rightExists: false, leftType: 'file', leftDetails: { size: 8950000000, modified: Date.now() }, copyable: true, issues: [] },
+          { relative: 'LUT/FilmStock_Rec709.cube', status: 'different', leftExists: true, rightExists: true, leftType: 'file', rightType: 'file', leftDetails: { size: 1250000, modified: Date.now() }, rightDetails: { size: 1250000, modified: Date.now() - 3600000 }, copyable: true, issues: ['Data di modifica differente'] },
+          { relative: 'A001_C005_1026K9_001.MOV', status: 'identical', leftExists: true, rightExists: true, leftType: 'file', rightType: 'file', leftDetails: { size: 5410000000, modified: Date.now() }, rightDetails: { size: 5410000000, modified: Date.now() }, copyable: false, issues: [] }
+        ]
+      };
+      document.getElementById('compare-progress').textContent = 'Analisi completata · 6 elementi analizzati';
+      setCompareProgress(100);
+      renderCompareVerdict();
+      renderCompareList();
+      updateCompareActions();
     })()`);
     await delay(600);
     snap = await command('Page.captureScreenshot', { format: 'png' });

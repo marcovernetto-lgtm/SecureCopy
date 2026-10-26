@@ -1266,16 +1266,51 @@ function hideCompareScreen() {
     } else showHomeScreen();
 }
 function updateCompareActions() {
-    const missing = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable).length || 0;
+    const missingToRight = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable && entry.leftExists) || [];
+    const missingTotal = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable).length || 0;
+    const differentTotal = compareResult?.entries.filter(entry => entry.status === 'different' && entry.copyable).length || 0;
+    const missingBytes = missingToRight.reduce((acc, e) => acc + (e.leftDetails?.size || 0), 0);
     const choices = compareChoices.size;
+
     document.getElementById('new-comparison-btn').hidden = compareStage !== 'results' || compareBusy || comparePreparing;
     const activeCount = operations.filter(item => ['processing', 'pausing', 'paused'].includes(item.status)).length;
-    compareActions.hidden = !compareResult;
-    compareReconcileBtn.hidden = !compareResult;
-    compareReconcileBtn.disabled = (compareBusy || comparePreparing) || activeCount >= 10 || missing + choices === 0;
-    compareReconcileBtn.textContent = missing + choices
-        ? `Copia tutti i mancanti (${missing})`
-        : 'Copia e verifica i file mancanti';
+    
+    if (compareActions) compareActions.hidden = !compareResult;
+
+    if (compareReconcileBtn) {
+        compareReconcileBtn.hidden = !compareResult;
+        const canSync = (missingTotal + differentTotal + choices > 0);
+        compareReconcileBtn.disabled = (compareBusy || comparePreparing) || activeCount >= 10 || !canSync;
+        
+        const reconcileLabel = document.getElementById('compare-reconcile-label');
+        if (reconcileLabel) {
+            if (missingToRight.length > 0) {
+                reconcileLabel.textContent = `Copia mancanti in Destinazione (${missingToRight.length} file · ${formatBytes(missingBytes)})`;
+            } else if (differentTotal > 0) {
+                reconcileLabel.textContent = `Sincronizza file diversi (${differentTotal} file)`;
+            } else if (missingTotal > 0) {
+                reconcileLabel.textContent = `Copia file mancanti (${missingTotal} file)`;
+            } else {
+                reconcileLabel.textContent = 'Tutti i file sono presenti sul disco ✓';
+            }
+        }
+    }
+
+    const bulkRight = document.getElementById('compare-bulk-right');
+    if (bulkRight) {
+        const missingOnLeft = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable && entry.rightExists) || [];
+        if (missingOnLeft.length > 0 && !compareBusy && !comparePreparing) {
+            bulkRight.hidden = false;
+            bulkRight.disabled = activeCount >= 10;
+            bulkRight.textContent = `Sincronizza verso Sorgente (${missingOnLeft.length})`;
+        } else {
+            bulkRight.hidden = true;
+        }
+    }
+
+    const bulkLeft = document.getElementById('compare-bulk-left');
+    if (bulkLeft) bulkLeft.hidden = true;
+
     compareContinueBtn.disabled = (compareBusy || comparePreparing) || activeCount >= 10 || !compareLeft || !compareRight;
     compareAnalyzeBtn.hidden = (compareBusy || comparePreparing);
     compareBackBtn.disabled = compareStage === 'results' && (compareBusy || comparePreparing);
@@ -1293,7 +1328,6 @@ function updateCompareActions() {
     document.getElementById('compare-retry').hidden = (compareBusy || comparePreparing) || !compareCopyErrors.size;
     document.getElementById('compare-resume').hidden = (compareBusy || comparePreparing) || !['cancelled', 'partial'].includes(compareResult?.status);
     compareCancelBtn.textContent = compareOperation === 'analysis' ? 'Annulla analisi' : 'Annulla copia';
-    for (const side of ['left', 'right']) document.getElementById(`compare-bulk-${side}`).disabled = (compareBusy || comparePreparing) || activeCount >= 10 || !compareResult?.entries.some(entry => entry.status !== 'identical' && entry.copyable && (side === 'left' ? entry.leftExists : entry.rightExists));
     renderCompareList();
     updateNavigation();
     updateStartButtonState();
@@ -1319,6 +1353,13 @@ function resetComparisonAfterSelection() {
     compareReportBtn?.classList.add('hidden');
     compareLeftBtn?.closest('.compare-picker')?.classList.toggle('has-selection', Boolean(compareLeft));
     compareRightBtn?.closest('.compare-picker')?.classList.toggle('has-selection', Boolean(compareRight));
+    const dashboard = document.getElementById('compare-results-dashboard');
+    if (dashboard) dashboard.classList.add('hidden');
+    document.querySelectorAll('.compare-metrics-grid .metric-card').forEach(c => {
+        c.classList.toggle('active', c.dataset.filter === 'all');
+    });
+    const filterSelect = document.getElementById('compare-status-filter');
+    if (filterSelect) filterSelect.value = 'all';
     renderCompareVerdict();
     compareProgressEl.textContent = compareLeft && compareRight
         ? 'Cartelle pronte. Premi Avvia analisi cartelle.'
@@ -1327,23 +1368,106 @@ function resetComparisonAfterSelection() {
     updateCompareActions();
 }
 function renderCompareVerdict() {
+    const dashboard = document.getElementById('compare-results-dashboard');
     if (!compareResult) {
-        compareVerdictEl.classList.add('hidden');
+        if (dashboard) dashboard.classList.add('hidden');
+        if (compareVerdictEl) compareVerdictEl.classList.add('hidden');
         return;
     }
-    let { summary, verdict } = compareResult;
-    if (compareBusy && compareOperation === 'reconcile' && compareLiveSummary) {
-        summary = compareLiveSummary;
-        verdict = summary.missing ? 'missing' : summary.different ? 'verify' : 'perfect';
+
+    const entries = compareResult.entries.map(liveCompareEntry);
+    const fileEntries = entries.filter(e => e.leftType !== 'directory' && e.rightType !== 'directory');
+
+    const identicalEntries = fileEntries.filter(e => e.status === 'identical');
+    const relocatedEntries = fileEntries.filter(e => e.status === 'relocated');
+    const missingEntries = fileEntries.filter(e => e.status === 'missing');
+    const differentEntries = fileEntries.filter(e => e.status === 'different');
+
+    const bytesIdentical = identicalEntries.reduce((acc, e) => acc + (e.leftDetails?.size || e.rightDetails?.size || 0), 0);
+    const bytesRelocated = relocatedEntries.reduce((acc, e) => acc + (e.leftDetails?.size || e.rightDetails?.size || 0), 0);
+    const bytesMissing = missingEntries.reduce((acc, e) => acc + (e.leftDetails?.size || e.rightDetails?.size || 0), 0);
+    const bytesDifferent = differentEntries.reduce((acc, e) => acc + (e.leftDetails?.size || e.rightDetails?.size || 0), 0);
+    const bytesTotal = bytesIdentical + bytesRelocated + bytesMissing + bytesDifferent;
+
+    // Presence on destination coverage percentage
+    const sourceFiles = fileEntries.filter(e => e.leftExists);
+    const sourceFilesPresent = sourceFiles.filter(e => e.status === 'identical' || (e.status === 'relocated' && e.relocatedSide === 'right'));
+    const coverage = sourceFiles.length > 0 ? Math.round((sourceFilesPresent.length / sourceFiles.length) * 100) : 100;
+
+    // Proportional Segmented Bar
+    const totalForBar = bytesTotal > 0 ? bytesTotal : (fileEntries.length || 1);
+    const pctIdentical = bytesTotal > 0 ? ((bytesIdentical / totalForBar) * 100) : ((identicalEntries.length / totalForBar) * 100);
+    const pctRelocated = bytesTotal > 0 ? ((bytesRelocated / totalForBar) * 100) : ((relocatedEntries.length / totalForBar) * 100);
+    const pctDifferent = bytesTotal > 0 ? ((bytesDifferent / totalForBar) * 100) : ((differentEntries.length / totalForBar) * 100);
+    const pctMissing = bytesTotal > 0 ? ((bytesMissing / totalForBar) * 100) : ((missingEntries.length / totalForBar) * 100);
+
+    const segId = document.getElementById('dist-seg-identical');
+    const segRel = document.getElementById('dist-seg-relocated');
+    const segDiff = document.getElementById('dist-seg-different');
+    const segMiss = document.getElementById('dist-seg-missing');
+    if (segId) segId.style.width = `${pctIdentical}%`;
+    if (segRel) segRel.style.width = `${pctRelocated}%`;
+    if (segDiff) segDiff.style.width = `${pctDifferent}%`;
+    if (segMiss) segMiss.style.width = `${pctMissing}%`;
+
+    // Metric Cards Counters and Byte Sizes
+    const countAll = document.getElementById('count-all');
+    const bytesAll = document.getElementById('bytes-all');
+    if (countAll) countAll.textContent = String(fileEntries.length || entries.length);
+    if (bytesAll) bytesAll.textContent = formatBytes(bytesTotal);
+
+    const countId = document.getElementById('count-identical');
+    const bytesId = document.getElementById('bytes-identical');
+    if (countId) countId.textContent = String(identicalEntries.length);
+    if (bytesId) bytesId.textContent = formatBytes(bytesIdentical);
+
+    const countRel = document.getElementById('count-relocated');
+    const bytesRel = document.getElementById('bytes-relocated');
+    if (countRel) countRel.textContent = String(relocatedEntries.length);
+    if (bytesRel) bytesRel.textContent = formatBytes(bytesRelocated);
+
+    const countMiss = document.getElementById('count-missing');
+    const bytesMiss = document.getElementById('bytes-missing');
+    if (countMiss) countMiss.textContent = String(missingEntries.length);
+    if (bytesMiss) bytesMiss.textContent = formatBytes(bytesMissing);
+
+    const countDiff = document.getElementById('count-different');
+    const bytesDiff = document.getElementById('bytes-different');
+    if (countDiff) countDiff.textContent = String(differentEntries.length);
+    if (bytesDiff) bytesDiff.textContent = formatBytes(bytesDifferent);
+
+    // Banner and Verdict
+    const coveragePctEl = document.getElementById('compare-coverage-pct');
+    if (coveragePctEl) coveragePctEl.textContent = `${coverage}%`;
+
+    const verdictIcon = document.getElementById('compare-verdict-icon');
+    const verdictTitle = document.getElementById('compare-verdict-title');
+    const verdictSubtitle = document.getElementById('compare-verdict-subtitle');
+
+    const isPerfect = (missingEntries.length === 0 && differentEntries.length === 0);
+    if (verdictIcon) {
+        verdictIcon.textContent = isPerfect ? '✓' : '!';
+        verdictIcon.className = `status-indicator-icon ${isPerfect ? 'ok' : 'warn'}`;
     }
-    compareVerdictEl.dataset.verdict = verdict;
-    compareVerdictEl.textContent = verdict === 'perfect'
-        ? (compareResult.mode === 'quick' ? `${summary.identical} elementi corrispondono per dimensione e data.` : `${summary.identical} elementi identici secondo l’analisi completa.`)
-        : verdict === 'missing'
-            ? `File mancanti — ${summary.missing} elementi assenti, ${summary.different} da verificare.`
-            : `Copia da verificare — ${summary.different} elementi con differenze.`;
-    if (compareResult.incremental) compareVerdictEl.textContent += ' · Esiti aggiornati per i file scelti; gli altri risalgono all’ultima analisi.';
-    compareVerdictEl.classList.remove('hidden');
+    if (verdictTitle) {
+        verdictTitle.textContent = isPerfect
+            ? 'Tutti i file sono presenti sul disco'
+            : missingEntries.length > 0
+                ? `${missingEntries.length} file mancanti da sincronizzare`
+                : `${differentEntries.length} file con differenze rilevate`;
+    }
+    if (verdictSubtitle) {
+        if (isPerfect) {
+            verdictSubtitle.textContent = relocatedEntries.length > 0
+                ? `${identicalEntries.length} identici · ${relocatedEntries.length} presenti in altra posizione · Integrità verificata`
+                : `${identicalEntries.length} file perfettamente allineati · Integrità garantita`;
+        } else {
+            verdictSubtitle.textContent = `${coverage}% presenza complessiva · ${formatBytes(bytesMissing)} mancanti in destinazione`;
+        }
+    }
+
+    if (dashboard) dashboard.classList.remove('hidden');
+    if (compareVerdictEl) compareVerdictEl.classList.add('hidden');
 }
 function liveCompareEntry(entry) {
     const verified = compareVerified.get(entry.relative);
@@ -1355,12 +1479,12 @@ function makeCompareRow(entry) {
     const row = document.createElement('div');
     row.className = `compare-row ${entry.status}${entry.leftExists && entry.rightExists ? ' present' : ''}`;
     row.dataset.relative = entry.relative;
-    row.dataset.presence = entry.leftExists && entry.rightExists ? 'both' : 'missing';
+    row.dataset.presence = entry.leftExists && entry.rightExists ? 'both' : (entry.status === 'relocated' ? 'relocated' : 'missing');
     const name = document.createElement('div');
     name.className = 'compare-name';
     const filename = document.createElement('span');
     filename.textContent = entry.relative;
-    if (entry.copyable && entry.status !== 'identical') {
+    if (entry.copyable && entry.status !== 'identical' && entry.status !== 'relocated') {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = compareSelection.has(entry.relative);
@@ -1375,15 +1499,30 @@ function makeCompareRow(entry) {
     name.append(filename);
     const label = document.createElement('span');
     label.className = 'compare-details';
-    label.textContent = compareCopyErrors.has(entry.relative) ? 'Copia da controllare · apri Dettagli' : entry.verified ? 'Copiato e verificato' : entry.created ? 'Cartella creata' : entry.status === 'missing' ? (entry.leftExists ? 'Manca in Destinazione' : 'Manca in Sorgente') : entry.status === 'different' ? 'Diverso' : 'Corrispondente';
-    if (compareCopyErrors.has(entry.relative)) label.classList.add('copy-warning');
+    if (entry.status === 'relocated') {
+        const badge = document.createElement('span');
+        badge.className = 'badge-relocated';
+        badge.textContent = '⇄ In altra posizione';
+        const targetSide = entry.relocatedSide === 'right' ? 'Destinazione' : 'Sorgente';
+        const sub = document.createElement('span');
+        sub.className = 'relocated-subpath';
+        sub.textContent = `↳ Presente in ${targetSide}: ${entry.relocatedPath}`;
+        label.append(badge, sub);
+    } else {
+        label.textContent = compareCopyErrors.has(entry.relative) ? 'Copia da controllare · apri Dettagli' : entry.verified ? 'Copiato e verificato' : entry.created ? 'Cartella creata' : entry.status === 'missing' ? (entry.leftExists ? 'Manca in Destinazione' : 'Manca in Sorgente') : entry.status === 'different' ? 'Diverso' : 'Corrispondente';
+        if (compareCopyErrors.has(entry.relative)) label.classList.add('copy-warning');
+    }
     name.append(label);
     const details = document.createElement('details');
     const summary = document.createElement('summary');
     summary.textContent = 'Dettagli';
     details.append(summary);
     const info = document.createElement('p');
-    info.textContent = [compareCopyErrors.get(entry.relative), ...(entry.warnings || []), ...entry.issues].filter(Boolean).join(' · ') || 'Nessuna differenza rilevata';
+    const baseInfo = [compareCopyErrors.get(entry.relative), ...(entry.warnings || []), ...entry.issues].filter(Boolean);
+    if (entry.status === 'relocated') {
+        baseInfo.unshift(`File identico rilevato in un'altra cartella: ${entry.relocatedPath}`);
+    }
+    info.textContent = baseInfo.join(' · ') || 'Nessuna differenza rilevata';
     details.append(info);
     for (const [side, data] of [['Sorgente', entry.leftDetails], ['Destinazione', entry.rightDetails]]) {
         if (!data) continue;
@@ -1405,16 +1544,27 @@ function makeCompareRow(entry) {
     details.className = 'compare-details';
     name.append(details);
     row.append(name);
-    for (const exists of [entry.leftExists, entry.rightExists]) {
-        const side = document.createElement('span');
-        side.className = `compare-side ${exists ? 'present' : 'absent'}`;
-        side.textContent = exists ? '✓' : '—';
-        side.setAttribute('aria-label', exists ? 'Presente' : 'Mancante');
-        row.append(side);
+    for (const [side, exists] of [['left', entry.leftExists], ['right', entry.rightExists]]) {
+        const sideEl = document.createElement('span');
+        if (exists) {
+            sideEl.className = 'compare-side present';
+            sideEl.textContent = '✓';
+            sideEl.setAttribute('aria-label', 'Presente');
+        } else if (entry.status === 'relocated') {
+            sideEl.className = 'compare-side present';
+            sideEl.textContent = '⇄';
+            sideEl.title = `Presente in: ${entry.relocatedPath}`;
+            sideEl.setAttribute('aria-label', 'Presente in altra posizione');
+        } else {
+            sideEl.className = 'compare-side absent';
+            sideEl.textContent = '—';
+            sideEl.setAttribute('aria-label', 'Mancante');
+        }
+        row.append(sideEl);
     }
     const action = document.createElement('div');
     action.className = 'compare-row-actions';
-    if (entry.status !== 'identical' && entry.copyable) {
+    if (entry.status !== 'identical' && entry.status !== 'relocated' && entry.copyable) {
         for (const [keep, exists, text] of [['left', entry.leftExists, '→ Destinazione'], ['right', entry.rightExists, '← Sorgente']]) {
             if (!exists) continue;
             const button = document.createElement('button');
@@ -1425,7 +1575,13 @@ function makeCompareRow(entry) {
             button.addEventListener('click', () => runComparisonCopy([{ relative: entry.relative, keep }], true));
             action.append(button);
         }
-    } else action.textContent = entry.status === 'identical' ? (entry.verified ? '✓ Verificato' : 'Corrispondente') : 'Verifica manuale';
+    } else {
+        action.textContent = entry.status === 'identical'
+            ? (entry.verified ? '✓ Verificato' : 'Corrispondente')
+            : entry.status === 'relocated'
+                ? '✓ Presente su disco'
+                : 'Verifica manuale';
+    }
     row.append(action);
     row.addEventListener('contextmenu', event => {
         event.preventDefault();
@@ -1440,14 +1596,39 @@ function renderCompareList() {
     compareList.replaceChildren();
     if (!compareResult) return;
     const filter = compareFilter.value.trim().toLocaleLowerCase('it');
-    const matching = compareResult.entries.map(liveCompareEntry).filter(entry =>
-        (entry.status !== 'identical' || document.getElementById('compare-status-filter').value === 'errors' && compareCopyErrors.has(entry.relative) || entry.verified || entry.created || compareVerified.has(entry.relative) || document.getElementById('compare-show-identical').checked || document.getElementById('compare-status-filter').value === 'verified') &&
-        (document.getElementById('compare-status-filter').value === 'all' || document.getElementById('compare-status-filter').value === entry.status || document.getElementById('compare-status-filter').value === 'verified' && (entry.verified || compareVerified.has(entry.relative)) || document.getElementById('compare-status-filter').value === 'errors' && (compareCopyErrors.has(entry.relative) || entry.leftType === 'error' || entry.rightType === 'error')) &&
-        (!filter || entry.relative.toLocaleLowerCase('it').includes(filter)));
+    const statusFilter = document.getElementById('compare-status-filter')?.value || 'all';
+    const showIdentical = document.getElementById('compare-show-identical')?.checked ?? true;
+
+    const matching = compareResult.entries.map(liveCompareEntry).filter(entry => {
+        if (statusFilter === 'all') {
+            if (entry.status === 'identical' && !showIdentical && !entry.verified && !entry.created && !compareVerified.has(entry.relative)) {
+                return false;
+            }
+        } else if (statusFilter === 'verified') {
+            if (entry.status !== 'identical' && !entry.verified && !compareVerified.has(entry.relative)) return false;
+        } else if (statusFilter === 'relocated') {
+            if (entry.status !== 'relocated') return false;
+        } else if (statusFilter === 'missing') {
+            if (entry.status !== 'missing') return false;
+        } else if (statusFilter === 'different') {
+            if (entry.status !== 'different') return false;
+        } else if (statusFilter === 'errors') {
+            if (!compareCopyErrors.has(entry.relative) && entry.leftType !== 'error' && entry.rightType !== 'error') return false;
+        }
+
+        if (filter) {
+            const relLower = entry.relative.toLocaleLowerCase('it');
+            const relocLower = (entry.relocatedPath || '').toLocaleLowerCase('it');
+            if (!relLower.includes(filter) && !relocLower.includes(filter)) return false;
+        }
+
+        return true;
+    });
+
     if (!matching.length) {
         const empty = document.createElement('p');
         empty.className = 'compare-empty';
-        empty.textContent = filter ? 'Nessun risultato per questa ricerca.' : 'Nessun file mancante o diverso.';
+        empty.textContent = filter ? 'Nessun risultato per questa ricerca.' : 'Nessun file presente per questa categoria.';
         compareList.append(empty);
     }
     const fragment = document.createDocumentFragment();
@@ -1796,7 +1977,23 @@ function updateCompareSelection() {
     document.getElementById('compare-select-visible').disabled = compareBusy;
     document.getElementById('compare-clear-selection').disabled = compareBusy;
 }
-document.getElementById('compare-status-filter').addEventListener('change', renderCompareList);
+document.getElementById('compare-status-filter').addEventListener('change', () => {
+    const val = document.getElementById('compare-status-filter').value;
+    document.querySelectorAll('.compare-metrics-grid .metric-card').forEach(c => {
+        c.classList.toggle('active', c.dataset.filter === val);
+    });
+    renderCompareList();
+});
+document.querySelectorAll('.compare-metrics-grid .metric-card').forEach(card => {
+    card.addEventListener('click', () => {
+        document.querySelectorAll('.compare-metrics-grid .metric-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        const filterVal = card.dataset.filter || 'all';
+        const filterSelect = document.getElementById('compare-status-filter');
+        if (filterSelect) filterSelect.value = filterVal;
+        renderCompareList();
+    });
+});
 document.getElementById('compare-select-visible').addEventListener('click', () => {
     for (const row of compareList.querySelectorAll('.compare-row')) if (row.querySelector('input[type="checkbox"]')) compareSelection.add(row.dataset.relative);
     renderCompareList();

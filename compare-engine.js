@@ -230,15 +230,111 @@ async function compareFolders(leftPath, rightPath, { signal, onProgress, mode = 
 function buildComparison(base) {
   const { mode, leftRoot, rightRoot, left, right } = base;
   const names = [...new Set([...left.keys(), ...right.keys()])].sort((a, b) => a.localeCompare(b));
+
+  // Identify files present across different subfolders/locations
+  const unmatchedLeft = [];
+  const unmatchedRight = [];
+  for (const relative of names) {
+    const hasL = left.has(relative);
+    const hasR = right.has(relative);
+    if (hasL && !hasR && left.get(relative)?.type === 'file') unmatchedLeft.push(relative);
+    else if (!hasL && hasR && right.get(relative)?.type === 'file') unmatchedRight.push(relative);
+  }
+
+  const rightByHash = new Map();
+  const rightByNameAndSize = new Map();
+  for (const rel of unmatchedRight) {
+    const entry = right.get(rel);
+    if (entry?.hash) rightByHash.set(entry.hash, rel);
+    if (entry?.stats?.size !== undefined) {
+      const key = `${entry.stats.size}:${path.basename(rel).toLowerCase()}`;
+      if (!rightByNameAndSize.has(key)) rightByNameAndSize.set(key, rel);
+    }
+  }
+
+  const relocatedLeftToRight = new Map();
+  const relocatedRightToLeft = new Map();
+  const claimedRight = new Set();
+
+  for (const leftRel of unmatchedLeft) {
+    const leftEntry = left.get(leftRel);
+    let matchedRightRel = null;
+    if (mode === 'deep' && leftEntry?.hash) {
+      const candidate = rightByHash.get(leftEntry.hash);
+      if (candidate && !claimedRight.has(candidate)) matchedRightRel = candidate;
+    }
+    if (!matchedRightRel && leftEntry?.stats?.size !== undefined) {
+      const key = `${leftEntry.stats.size}:${path.basename(leftRel).toLowerCase()}`;
+      const candidate = rightByNameAndSize.get(key);
+      if (candidate && !claimedRight.has(candidate)) {
+        if (mode === 'quick' || !leftEntry.hash || !right.get(candidate)?.hash || leftEntry.hash === right.get(candidate).hash) {
+          matchedRightRel = candidate;
+        }
+      }
+    }
+    if (matchedRightRel) {
+      claimedRight.add(matchedRightRel);
+      relocatedLeftToRight.set(leftRel, matchedRightRel);
+      relocatedRightToLeft.set(matchedRightRel, leftRel);
+    }
+  }
+
   const entries = names.map(relative => {
     const a = left.get(relative), b = right.get(relative), confirmed = base.confirmed?.get(relative);
     const valid = confirmed && a?.stats && b?.stats &&
       matches(confirmed.left, a.stats, a.type === 'directory') && matches(confirmed.right, b.stats, b.type === 'directory');
+
+    if (relocatedLeftToRight.has(relative)) {
+      const rightRel = relocatedLeftToRight.get(relative);
+      const rightEntry = right.get(rightRel);
+      return {
+        relative,
+        status: 'relocated',
+        relocatedPath: rightRel,
+        relocatedSide: 'right',
+        issues: [`presente in destinazione in: ${rightRel}`],
+        leftExists: true,
+        rightExists: true,
+        leftType: 'file',
+        rightType: 'file',
+        copyable: false,
+        leftDetails: entryDetails(a),
+        rightDetails: entryDetails(rightEntry),
+        verified: true,
+        created: false,
+        warnings: []
+      };
+    }
+
+    if (relocatedRightToLeft.has(relative)) {
+      const leftRel = relocatedRightToLeft.get(relative);
+      const leftEntry = left.get(leftRel);
+      return {
+        relative,
+        status: 'relocated',
+        relocatedPath: leftRel,
+        relocatedSide: 'left',
+        issues: [`presente in sorgente in: ${leftRel}`],
+        leftExists: true,
+        rightExists: true,
+        leftType: 'file',
+        rightType: 'file',
+        copyable: false,
+        leftDetails: entryDetails(leftEntry),
+        rightDetails: entryDetails(b),
+        verified: true,
+        created: false,
+        warnings: []
+      };
+    }
+
     return { ...publicEntry(relative, a, b), leftDetails: entryDetails(a), rightDetails: entryDetails(b),
       verified: Boolean(valid && confirmed.sha256), created: Boolean(valid && confirmed.directory), warnings: valid ? confirmed.warnings || [] : [] };
   });
-  const summary = { identical: 0, different: 0, missing: 0 };
-  for (const entry of entries) summary[entry.status]++;
+  const summary = { identical: 0, different: 0, missing: 0, relocated: 0 };
+  for (const entry of entries) {
+    if (summary[entry.status] !== undefined) summary[entry.status]++;
+  }
   const verdict = summary.missing ? 'missing' : summary.different ? 'verify' : 'perfect';
   const compact = item => item ? [item.type, item.hash, item.metadata, item.target, item.error || item.verificationError,
     item.stats && (item.type === 'directory' ? [item.stats.dev, item.stats.ino, item.stats.mode] : snapshot(item.stats))] : null;

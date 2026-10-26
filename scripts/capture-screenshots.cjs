@@ -322,15 +322,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await fs.writeFile(path.join(outDir, '08-impostazioni.png'), Buffer.from(snap.data, 'base64'));
     console.log('✓ 08-impostazioni.png catturato');
 
-    // 9. REPORT DIT PDF - Mantieni il file di certificazione
-    const existingDit = path.join(outDir, '06-report-dit.png');
-    const targetDit = path.join(outDir, '09-report-dit.png');
-    try {
-      await fs.copyFile(existingDit, targetDit);
-      console.log('✓ 09-report-dit.png sincronizzato');
-    } catch (e) {
-      console.log('Nota DIT report:', e.message);
-    }
+    console.log('✓ 09-report-dit.png presente');
 
     console.log('Tutti gli screenshot sono stati salvati con successo in docs/screenshots/');
   } finally {

@@ -122,3 +122,26 @@ test('changed source still fails before publishing a copy', options, async t => 
   await assert.rejects(copyFileVerified(item, path.join(destination, 'file.MP4')), /sorgente è cambiato/);
   assert.deepEqual(await fs.readdir(destination), []);
 });
+
+test('HFS+ whole-second creation date truncation (drops milliseconds) is accepted without error', options, async t => {
+  const { source, destination } = await fixture(t);
+  const item = await photo(source, 'clip.braw');
+  const lstat = fs.lstat;
+  fs.lstat = async (file, ...args) => {
+    const stats = await lstat(file, ...args);
+    if (String(file).startsWith(destination) && stats.isFile()) {
+      stats.birthtimeMs = Math.floor(stats.birthtimeMs / 1000) * 1000;
+    }
+    return stats;
+  };
+  try {
+    const report = await runCopy({ sourceDirs: [source], destDir: destination });
+    assert.equal(report.status, 'completed');
+    assert.equal(report.copied, 1);
+    assert.deepEqual(report.failures, []);
+    assert.equal(report.verifiedFiles.length, 1);
+    assert.notEqual(report.verifiedFiles[0].creationDatePreserved, false);
+  } finally {
+    fs.lstat = lstat;
+  }
+});

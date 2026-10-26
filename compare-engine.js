@@ -6,7 +6,7 @@ const { promisify } = require('util');
 const { execFile } = require('child_process');
 const { sha256, copyFileVerified, readResourceFork, sameResourceFork, requireCreationDate } = require('./copy-engine');
 const { visibleEntries } = require('./visible-files');
-const { TIMESTAMP_TOLERANCE_MS, readMacMetadata } = require('./file-metadata');
+const { TIMESTAMP_TOLERANCE_MS, sameTimestamp, readMacMetadata } = require('./file-metadata');
 const { snapshot, matches, statOrNull, captureDirectory, assertDirectory, overlap } = require('./fs-safety');
 
 const execFileAsync = promisify(execFile);
@@ -48,6 +48,7 @@ async function inspect(fullPath, stats, signal, onBytes, mode, knownHash) {
 async function inventory(root, signal, onProgress, side, exclusions = []) {
   const items = new Map();
   let lastProgress = 0;
+  const exclusionRegexes = exclusions.map(pattern => new RegExp('^' + pattern.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i'));
   async function visit(relative, depth = 0) {
     check(signal);
     const directory = path.join(root, relative);
@@ -63,7 +64,7 @@ async function inventory(root, signal, onProgress, side, exclusions = []) {
       else throw error;
       return;
     }
-    children = children.filter(child => !child.name.startsWith('.') && !exclusions.some(pattern => new RegExp('^' + pattern.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i').test(child.name)));
+    children = children.filter(child => !child.name.startsWith('.') && !exclusionRegexes.some(rx => rx.test(child.name)));
     children = await visibleEntries(directory, children, signal);
     children.sort((a, b) => a.name.localeCompare(b.name));
     for (const child of children) {
@@ -100,7 +101,7 @@ function entryIssues(left, right) {
   if (left.hash !== right.hash) issues.push(labels.content);
   for (const key of Object.keys(left.metadata)) {
     const a = left.metadata[key], b = right.metadata[key];
-    const same = key.endsWith('timeMs') ? Math.abs(a - b) <= (left.hash && right.hash ? TIMESTAMP_TOLERANCE_MS : 5) :
+    const same = key.endsWith('timeMs') ? sameTimestamp(a, b) :
       JSON.stringify(a) === JSON.stringify(b);
     if (!same) issues.push(labels[key] || key);
   }

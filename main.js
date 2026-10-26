@@ -7,9 +7,13 @@ const { runCopy } = require('./copy-engine');
 const { RETENTION_DAYS, managedDirectory, cleanupArtifacts, saveActivityLog } = require('./artifact-retention');
 const { overlap, snapshot, matches } = require('./fs-safety');
 const { compareFolders, reconcileFolders, forRenderer, expandComparisonDecisions } = require('./compare-engine');
+const { createUpdater } = require('./updater');
+const { exportDITReportPDF } = require('./dit-report');
 
 let mainWindow;
 let backgroundService = null;
+let appUpdater = null;
+let updaterInterval = null;
 let quitting = false;
 const profileDirectory = app.commandLine?.getSwitchValue('user-data-dir');
 if (profileDirectory) app.setPath('userData', path.resolve(profileDirectory));
@@ -162,10 +166,20 @@ function createWindow(background = false) {
   });
   const localPage = path.join(__dirname, 'index.html');
   const allowedExternal = new Set([
-    'https://buymeacoffee.com/vemarcus'
+    'https://buymeacoffee.com/vemarcus',
+    'https://github.com/marcovernetto-lgtm/SecureCopy',
+    'https://github.com/marcovernetto-lgtm/SecureCopy/releases'
   ]);
   const openApprovedExternal = url => {
-    if (allowedExternal.has(url)) shell.openExternal(url).catch(error => sendLog('WARNING', error.message));
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' && (
+        allowedExternal.has(url) ||
+        (parsed.hostname === 'github.com' && parsed.pathname.startsWith('/marcovernetto-lgtm/SecureCopy'))
+      )) {
+        shell.openExternal(url).catch(error => sendLog('WARNING', error.message));
+      }
+    } catch {}
   };
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     openApprovedExternal(url);
@@ -211,6 +225,30 @@ app.whenReady().then(async () => {
   if (background) app.dock?.hide();
   backgroundService.start().catch(error => console.error('Avvio monitor dischi:', error.message));
   app.on('activate', openMainWindow);
+
+  appUpdater = createUpdater({
+    app,
+    getCurrentVersion: () => app.getVersion(),
+    getLanguage: () => uiLanguage,
+    onStatusChange: (status) => {
+      send('update-status-changed', status);
+    }
+  });
+
+  setTimeout(() => {
+    if (!quitting && appUpdater) {
+      appUpdater.checkForUpdates({ silent: true }).catch(err => {
+        console.warn('[Updater] Avvio silenzioso:', err.message);
+      });
+    }
+  }, 4000);
+
+  updaterInterval = setInterval(() => {
+    if (!quitting && appUpdater) {
+      appUpdater.checkForUpdates({ silent: true }).catch(() => {});
+    }
+  }, 4 * 60 * 60 * 1000);
+  updaterInterval.unref();
 });
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -219,6 +257,7 @@ app.on('before-quit', event => {
   if (quitting) return;
   quitting = true;
   clearInterval(retentionTimer);
+  if (updaterInterval) clearInterval(updaterInterval);
   backgroundService?.stop();
   saveQueue();
   saveComparisonRecovery(true);
@@ -235,6 +274,12 @@ app.on('render-process-gone', (_event, contents, details) => {
     mainWindow.reload();
   }
 });
+
+handle('get-app-version', () => app.getVersion());
+handle('check-for-updates', () => appUpdater ? appUpdater.checkForUpdates({ silent: false }) : { status: 'idle' });
+handle('install-update', () => appUpdater ? appUpdater.downloadAndInstallUpdate() : { status: 'idle' });
+handle('relaunch-app', () => appUpdater ? appUpdater.relaunchApp() : false);
+handle('get-update-status', () => appUpdater ? appUpdater.getStatus() : { status: 'idle' });
 
 handle('get-pending-copy-recovery-count', () => pendingCopyRecovery.length);
 handle('recover-pending-copies', () => {
@@ -279,8 +324,8 @@ handle('dialog:openDirectory', async () => {
 });
 handle('dialog:openMultipleDirectories', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory', 'multiSelections'],
-    title: uiLanguage === 'en' ? 'Choose source folders' : 'Scegli le cartelle sorgente',
+    properties: ['openFile', 'openDirectory', 'multiSelections'],
+    title: uiLanguage === 'en' ? 'Choose source files or folders' : 'Scegli file o cartelle sorgente',
     buttonLabel: uiLanguage === 'en' ? 'Choose' : 'Scegli'
   });
   if (!result.canceled) backgroundService?.confirmSelectedSources(result.filePaths);
@@ -486,6 +531,20 @@ handle('open-report', id => {
   shell.showItemInFolder(file);
   return true;
 });
+handle('export-dit-report', async id => {
+  let reportPath = completedReports.get(id);
+  if (!reportPath) {
+    const { directory } = await managedDirectory(app.getPath('userData'), 'reports', { create: true });
+    const direct = path.join(directory, `SecureCopy-verifica-${id}.json`);
+    if (fs.existsSync(direct)) reportPath = direct;
+  }
+  if (!reportPath || !fs.existsSync(reportPath)) {
+    throw new Error('Report di verifica non trovato per questa operazione.');
+  }
+  const reportData = JSON.parse(await fs.promises.readFile(reportPath, 'utf8'));
+  const { directory } = await managedDirectory(app.getPath('userData'), 'reports', { create: true });
+  return await exportDITReportPDF(reportData, BrowserWindow, shell, directory);
+});
 handle('open-copy-destination', async id => {
   const item = completedJobs.find(job => job.id === id);
   if (!item || item.kind === 'compare' || typeof item.destDir !== 'string') return false;
@@ -540,7 +599,7 @@ handle('start-batch', (sourceDirs, destDirs, mode, policy = 'replace') => {
   const resolved = destDirs.map(canonicalSync);
   if (new Set(resolved).size !== resolved.length) throw new Error('Le destinazioni devono essere diverse.');
   const items = destDirs.map(destDir => makeItem(sourceDirs, destDir,
-    `Copia ${sourceDirs.length} cartella/e → ${destDir}`, mode));
+    `Copia ${sourceDirs.length > 1 ? `${sourceDirs.length} elementi` : path.basename(sourceDirs[0])} → ${destDir}`, mode));
   for (const item of items) item.policy = policy;
   if (mode === 'after') {
     const waitFor = [...activeJobs.keys(), ...(compareController ? [comparisonItem.id] : [])];

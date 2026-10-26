@@ -97,13 +97,22 @@ test('permission-only differences cannot be reported as identical', options, asy
   assert.equal((await fs.stat(sourceFile)).mode, (await fs.stat(targetFile)).mode);
 });
 
-test('a two-millisecond date difference cannot be reported as identical', options, async t => {
+test('a two-minute date difference cannot be reported as identical', options, async t => {
   const { source, destination, targetFile } = await fixture(t);
   const original = await fs.stat(targetFile);
-  await fs.utimes(targetFile, original.atimeMs / 1000, (original.mtimeMs + 2) / 1000);
+  await fs.utimes(targetFile, original.atimeMs / 1000, (original.mtimeMs + 120000) / 1000);
   await setCreationTime(targetFile, original.birthtimeMs);
   const result = await runCopy({ sourceDirs: [source], destDir: destination, allowMetadataDifferences: false });
   assert.equal(result.copied, 1); assert.equal(result.skipped, 0); assert.deepEqual(result.failures, []);
+});
+
+test('seconds/sub-minute date differences within tolerance are treated as identical', options, async t => {
+  const { source, destination, targetFile } = await fixture(t);
+  const original = await fs.stat(targetFile);
+  await fs.utimes(targetFile, original.atimeMs / 1000, (original.mtimeMs + 5000) / 1000);
+  await setCreationTime(targetFile, original.birthtimeMs);
+  const result = await runCopy({ sourceDirs: [source], destDir: destination, allowMetadataDifferences: false });
+  assert.equal(result.copied, 0); assert.equal(result.skipped, 1); assert.deepEqual(result.failures, []);
 });
 
 test('native sub-millisecond dates are preserved and do not cause repeated copying', options, async t => {

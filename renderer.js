@@ -58,11 +58,18 @@ const failureDetails = document.getElementById('failure-details');
 const failureSummary = document.getElementById('failure-summary');
 const failureList = document.getElementById('failure-list');
 const openReportBtn = document.getElementById('open-report-btn');
+const exportDITReportBtn = document.getElementById('export-dit-report-btn');
 const openCopyDestinationBtn = document.getElementById('open-copy-destination-btn');
 const openReportsFolderBtn = document.getElementById('open-reports-folder-btn');
 const homeScreen = document.getElementById('home-screen');
 const sourceList = document.getElementById('source-list');
 const homeCopyBtn = document.getElementById('copy-nav-btn');
+const flowCard = document.getElementById('transfer-flow-card');
+const flowSourceName = document.getElementById('flow-source-name');
+const flowSourcePath = document.getElementById('flow-source-path');
+const flowDestName = document.getElementById('flow-dest-name');
+const flowDestPath = document.getElementById('flow-dest-path');
+const flowSpeedTag = document.getElementById('flow-speed-tag');
 const navHomeBtn = document.getElementById('nav-home-btn');
 const navCopyBtn = document.getElementById('nav-copy-btn');
 const navCompareBtn = document.getElementById('nav-compare-btn');
@@ -140,6 +147,7 @@ function displayResult(result, jobId = focusedJobId) {
     resultSummary.classList.remove('hidden');
     document.getElementById('retry-copy-btn').classList.toggle('hidden', result.status === 'completed');
     openReportBtn?.classList.toggle('hidden', !result.reportPath);
+    document.getElementById('export-dit-report-btn')?.classList.toggle('hidden', !result.reportPath);
     openCopyDestinationBtn?.classList.toggle('hidden', !jobId);
     newCopyBtn.textContent = 'Nuova copia';
     newCopyBtn?.classList.remove('hidden');
@@ -222,14 +230,74 @@ function renderComparisonProgress(item) {
     } else resultSummary.classList.add('hidden');
     failureDetails?.classList.add('hidden');
     openReportBtn.classList.toggle('hidden', !item.reportId);
+    document.getElementById('export-dit-report-btn')?.classList.toggle('hidden', !item.reportId || item.kind === 'compare');
 }
+function updateTransferFlowUI(item) {
+    if (!flowCard) return;
+    if (!item) {
+        flowCard.classList.add('hidden');
+        return;
+    }
+    flowCard.classList.remove('hidden');
+    if (item.kind === 'compare') {
+        const leftBase = item.leftRoot ? item.leftRoot.split(/[/\\]/).filter(Boolean).pop() || item.leftRoot : 'Sinistra';
+        const rightBase = item.rightRoot ? item.rightRoot.split(/[/\\]/).filter(Boolean).pop() || item.rightRoot : 'Destra';
+        if (flowSourceName) flowSourceName.textContent = leftBase;
+        if (flowSourcePath) { flowSourcePath.textContent = item.leftRoot || ''; flowSourcePath.title = item.leftRoot || ''; }
+        if (flowDestName) flowDestName.textContent = rightBase;
+        if (flowDestPath) { flowDestPath.textContent = item.rightRoot || ''; flowDestPath.title = item.rightRoot || ''; }
+        if (flowSpeedTag) flowSpeedTag.textContent = item.status === 'completed' ? 'Confronto verificato' : 'Analisi cartelle in corso';
+    } else {
+        const sources = item.sourceDirs || [];
+        let srcName = 'Sorgente';
+        let srcPath = '';
+        if (sources.length === 1) {
+            srcName = sources[0].split(/[/\\]/).filter(Boolean).pop() || sources[0];
+            srcPath = sources[0];
+        } else if (sources.length > 1) {
+            srcName = `${sources.length} elementi`;
+            srcPath = sources.map(s => s.split(/[/\\]/).filter(Boolean).pop() || s).join(', ');
+        }
+        const dest = item.destDir || '';
+        const dstName = dest ? dest.split(/[/\\]/).filter(Boolean).pop() || dest : 'Destinazione';
+
+        if (flowSourceName) flowSourceName.textContent = srcName;
+        if (flowSourcePath) { flowSourcePath.textContent = srcPath; flowSourcePath.title = srcPath; }
+        if (flowDestName) flowDestName.textContent = dstName;
+        if (flowDestPath) { flowDestPath.textContent = dest; flowDestPath.title = dest; }
+        if (flowSpeedTag) {
+            const latest = latestProgress.get(item.id);
+            if (latest?.averageSpeedBytesPerSec) {
+                flowSpeedTag.textContent = `${formatBytes(latest.averageSpeedBytesPerSec)}/s · In trasferimento`;
+            } else if (item.status === 'completed') {
+                flowSpeedTag.textContent = 'Trasferimento completato e verificato';
+            } else if (item.status === 'paused') {
+                flowSpeedTag.textContent = 'In pausa';
+            } else {
+                flowSpeedTag.textContent = 'Flusso dati sicuro';
+            }
+        }
+    }
+}
+
 function renderSelectedOperation(item) {
     document.getElementById('metadata-details').classList.add('hidden');
     resetProgressUI();
+    updateTransferFlowUI(item);
     if (item.kind === 'compare') {
         renderComparisonProgress(item);
     } else {
-        if (latestProgress.has(item.id)) renderCopyProgress(latestProgress.get(item.id));
+        if (latestProgress.has(item.id)) {
+            renderCopyProgress(latestProgress.get(item.id));
+        } else if (item.status === 'processing' || item.status === 'pausing' || item.status === 'paused') {
+            renderCopyProgress({
+                percentage: item.progress || 0,
+                filesProcessed: item.filesProcessed || 0,
+                totalFiles: item.totalFiles || 0,
+                phase: item.phase || 'copy',
+                currentFile: item.current || item.currentFile || ''
+            });
+        }
         if (item.result) displayResult(item.result, item.id);
     }
 }
@@ -306,8 +374,21 @@ if (window.electronAPI) {
                 current: data.current, processedItems: data.processedItems,
                 totalItems: data.totalItems, filesProcessed: data.filesProcessed,
                 totalFiles: data.totalFiles });
-            renderQueueItems();
-            if (item.kind === 'compare' && item.id === focusedJobId) renderComparisonProgress(item);
+            updateQueueItemState(item);
+            if (item.id === focusedJobId) {
+                if (item.kind === 'compare') renderComparisonProgress(item);
+                else if (!item.result) {
+                    const progressPayload = latestProgress.get(item.id) || {
+                        ...data,
+                        percentage: data.percentage ?? item.progress ?? 0,
+                        filesProcessed: data.filesProcessed ?? item.filesProcessed ?? 0,
+                        totalFiles: data.totalFiles ?? item.totalFiles ?? 0,
+                        phase: data.phase || item.phase || 'copy',
+                        currentFile: data.current || item.current || item.currentFile || ''
+                    };
+                    renderCopyProgress(progressPayload);
+                }
+            }
         }
     });
     window.electronAPI.onQueueEmpty(() => logMessage({ message: 'Coda completata', className: 'text-green-400' }));
@@ -349,6 +430,12 @@ function renderCopyProgress(data) {
             ? `${reading ? (data.phase === 'verify' ? 'Verifica' : 'Controllo') + ' · ' : ''}${Math.min(100, Math.round(fileBytes / fileTotal * 100))}% · ${formatBytes(fileBytes)} / ${formatBytes(fileTotal)}`
             : data.phase === 'verify' ? 'Verifica' : data.phase === 'compare' ? 'Controllo' : '0%';
         updateAverageSpeed(data.averageSpeedBytesPerSec);
+        const speedTag = document.getElementById('flow-speed-tag');
+        if (speedTag) {
+            if (data.averageSpeedBytesPerSec) speedTag.textContent = `${formatBytes(data.averageSpeedBytesPerSec)}/s · In trasferimento`;
+            else if (data.phase === 'scan') speedTag.textContent = 'Scansione elementi…';
+            else if (data.phase === 'verify') speedTag.textContent = 'Verifica SHA-256 e metadati…';
+        }
         if (progressStatus) progressStatus.textContent = ({
             scan: 'Preparazione', compare: 'Controllo dei file',
             copy: 'Copia in corso', verify: 'Verifica in corso'
@@ -405,7 +492,7 @@ function updateStartButtonState() {
 }
 function renderSources() {
     sourcePathEl.textContent = sourcePaths.length
-        ? `${sourcePaths.length} ${sourcePaths.length === 1 ? 'cartella selezionata' : 'cartelle selezionate'}`
+        ? `${sourcePaths.length} ${sourcePaths.length === 1 ? 'elemento selezionato' : 'elementi selezionati'}`
         : 'Nessuna sorgente selezionata';
     sourceList.replaceChildren();
     for (const source of sourcePaths) {
@@ -458,9 +545,14 @@ function addDestination(dest) {
 function clearSelection() {
     sourcePaths = [];
     destPaths = [];
+    if (sourceBtn) {
+        sourceBtn.classList.remove('btn-source-active');
+        sourceBtn.classList.add('btn-source-idle');
+    }
     renderSources();
     renderDestinations();
     updateStartButtonState();
+    updateAnimation();
 }
 function switchScreen(view) {
     currentScreen = view;
@@ -546,6 +638,30 @@ function updateQueueDisplay() {
     renderQueueItems();
     updateStartButtonState();
 }
+function updateQueueSelectionUI() {
+    if (!queueItems) return;
+    for (const btn of queueItems.querySelectorAll('.job-select')) {
+        btn.classList.toggle('selected', btn.dataset.id === focusedJobId);
+    }
+}
+
+function updateQueueItemState(item) {
+    if (!queueItems) return;
+    const row = queueItems.querySelector(`[data-id="${item.id}"]`);
+    if (!row) return;
+    const badge = row.querySelector('.job-state');
+    if (!badge) return;
+    const state = item.paused ? 'In pausa dopo il file' : item.kind === 'compare' && item.status === 'completed'
+        ? ({ perfect: item.mode === 'quick' ? 'Corrispondenza rapida' : 'Contenuti verificati', verify: 'Da verificare', missing: 'File mancanti' }[item.verdict] || 'Completato')
+        : { pending: 'In attesa', pausing: 'Pausa dopo il file', paused: 'In pausa', completed: 'Completata',
+        partial: 'Parziale', failed: 'Fallita', cancelled: 'Annullata' }[item.status] || `In corso ${item.progress || 0}%`;
+    const statusAttr = item.kind === 'compare' && item.status === 'completed'
+        ? item.verdict === 'missing' ? 'failed' : item.verdict === 'verify' ? 'partial' : 'completed'
+        : item.status;
+    if (badge.textContent !== state) badge.textContent = state;
+    if (badge.dataset.status !== statusAttr) badge.dataset.status = statusAttr;
+}
+
 function renderQueueItems() {
     if (!queueItems) return;
     queueItems.replaceChildren();
@@ -553,7 +669,10 @@ function renderQueueItems() {
     operations.forEach((item, index) => {
         const row = document.createElement('div');
         row.className = 'queue-item';
+        row.dataset.id = item.id;
         const select = document.createElement('button');
+        select.type = 'button';
+        select.dataset.id = item.id;
         select.className = `job-select ${item.id === focusedJobId ? 'selected' : ''}`;
         const state = item.paused ? 'In pausa dopo il file' : item.kind === 'compare' && item.status === 'completed'
             ? ({ perfect: item.mode === 'quick' ? 'Corrispondenza rapida' : 'Contenuti verificati', verify: 'Da verificare', missing: 'File mancanti' }[item.verdict] || 'Completato')
@@ -573,7 +692,7 @@ function renderQueueItems() {
         select.addEventListener('click', () => {
             focusedJobId = item.id;
             renderSelectedOperation(item);
-            renderQueueItems();
+            updateQueueSelectionUI();
             updateQueueControls();
         });
         row.append(select);
@@ -581,6 +700,7 @@ function renderQueueItems() {
             const position = pending.findIndex(entry => entry.id === item.id);
             for (const [label, dir, disabled] of [['↑', 'up', position === 0], ['↓', 'down', position === pending.length - 1]]) {
                 const btn = document.createElement('button');
+                btn.type = 'button';
                 btn.textContent = label;
                 btn.title = dir === 'up' ? 'Sposta su' : 'Sposta giù';
                 btn.disabled = disabled;
@@ -589,6 +709,7 @@ function renderQueueItems() {
                 row.append(btn);
             }
             const remove = document.createElement('button');
+            remove.type = 'button';
             remove.textContent = '×';
             remove.title = 'Rimuovi dalla coda';
             remove.className = 'queue-icon-button danger-text';
@@ -615,7 +736,23 @@ function updateQueueControls() {
     updateNavigation();
     updateStartButtonState();
 }
-function initializeQueueDisplay() { updateQueueDisplay(); }
+function initializeQueueDisplay() {
+    if (queueItems) {
+        queueItems.addEventListener('click', (event) => {
+            const select = event.target.closest('.job-select');
+            if (select && select.dataset.id && select.dataset.id !== focusedJobId) {
+                const item = operations.find(op => op.id === select.dataset.id);
+                if (item) {
+                    focusedJobId = item.id;
+                    renderSelectedOperation(item);
+                    updateQueueSelectionUI();
+                    updateQueueControls();
+                }
+            }
+        });
+    }
+    updateQueueDisplay();
+}
 const recoverCopyQueueBtn = document.getElementById('recover-copy-queue');
 window.electronAPI?.getPendingCopyRecoveryCount?.().then(count => { recoverCopyQueueBtn.hidden = !count; }).catch(console.error);
 recoverCopyQueueBtn.addEventListener('click', async () => {
@@ -643,10 +780,15 @@ function initializeParticles() {
 }
 function updateAnimation() {
     if (!headerContainer) return;
-    const processing = copyQueue.some(item => item.status === 'processing' || item.status === 'pausing');
-    const paused = copyQueue.some(item => item.status === 'paused');
-    headerContainer.classList.toggle('running', processing || paused);
-    headerContainer.classList.toggle('paused', !processing && paused);
+    const isCopying = copyQueue.some(item => item.status === 'processing' || item.status === 'pausing');
+    const isPaused = copyQueue.some(item => item.status === 'paused');
+    const allowedScreen = currentScreen === 'monitor' || (currentScreen === 'copy' && (isCopying || isPaused));
+    const shouldRun = allowedScreen && isCopying;
+    const shouldPause = allowedScreen && isPaused;
+
+    headerContainer.classList.toggle('running', shouldRun || shouldPause);
+    headerContainer.classList.toggle('paused', shouldPause);
+    headerContainer.classList.toggle('monitor-view', currentScreen === 'monitor');
 }
 function activateFileFlow() { updateAnimation(); }
 function stopParticles() { updateAnimation(); }
@@ -670,7 +812,7 @@ if (sourceBtn) {
         const paths = await window.electronAPI.selectMultipleFolders();
         if (paths?.length > 0) {
             sourcePaths = paths;
-            const text = paths.length === 1 ? `1 cartella selezionata: ${paths[0]}` : `${paths.length} cartelle selezionate`;
+            const text = paths.length === 1 ? `1 elemento selezionato: ${paths[0]}` : `${paths.length} elementi selezionati`;
             renderSources();
             logMessage({ message: `Sorgente: ${text}`, className: 'text-gray-400' });
 
@@ -733,6 +875,23 @@ openReportBtn?.addEventListener('click', async () => {
     const item = operations.find(operation => operation.id === focusedJobId);
     const reportId = item?.kind === 'compare' ? item.reportId : focusedJobId;
     if (reportId) await window.electronAPI.openReport(reportId);
+});
+exportDITReportBtn?.addEventListener('click', async () => {
+    const item = operations.find(operation => operation.id === focusedJobId);
+    const reportId = item?.kind === 'compare' ? item.reportId : focusedJobId;
+    if (!reportId) return;
+    const originalText = exportDITReportBtn.innerHTML;
+    exportDITReportBtn.disabled = true;
+    exportDITReportBtn.textContent = 'Generazione PDF in corso...';
+    try {
+        await window.electronAPI.exportDITReport(reportId);
+    } catch (error) {
+        console.error('Errore esportazione PDF DIT:', error);
+        alert('Impossibile generare il PDF DIT: ' + error.message);
+    } finally {
+        exportDITReportBtn.disabled = false;
+        exportDITReportBtn.innerHTML = originalText;
+    }
 });
 openCopyDestinationBtn?.addEventListener('click', async () => {
     const id = focusedJobId;
@@ -856,7 +1015,8 @@ async function generateHTMLLog() {
     finally { printLogBtn.disabled = false; }
 }
 function resetProgressUI() {
-    document.getElementById('metadata-details').classList.add('hidden');
+    if (typeof updateTransferFlowUI === 'function') updateTransferFlowUI(null);
+    document.getElementById('metadata-details')?.classList.add('hidden');
     if (progressBar) { progressBar.style.width = '0%'; progressBar.dataset.status = 'processing'; }
     if (progressPercentage) progressPercentage.textContent = '0%';
     if (progressDetails) progressDetails.textContent = 'Inizializzazione...';
@@ -870,6 +1030,7 @@ function resetProgressUI() {
     if (resultSummary) resultSummary.classList.add('hidden');
     failureDetails?.classList.add('hidden');
     openReportBtn?.classList.add('hidden');
+    document.getElementById('export-dit-report-btn')?.classList.add('hidden');
     openCopyDestinationBtn?.classList.add('hidden');
     newCopyBtn?.classList.add('hidden');
 }
@@ -909,11 +1070,6 @@ if (sourceBtn) {
         sourceBtn.classList.remove('border-teal-400', 'bg-teal-900/20');
         sourceZone.classList.remove('drag-over');
 
-        const entries = Array.from(e.dataTransfer.items || []).map(item => item.webkitGetAsEntry?.()).filter(Boolean);
-        if (entries.some(entry => !entry.isDirectory)) {
-            logMessage({ message: 'Trascina solo cartelle nella sorgente.', className: 'text-orange-400' });
-            return;
-        }
         const files = Array.from(e.dataTransfer.files).map(f => window.electronAPI.getPathForFile(f)).filter(Boolean);
         if (files.length > 0) {
             sourcePaths = files;
@@ -1637,4 +1793,122 @@ window.electronAPI?.onDiskImportRequested?.(request => {
     sourcePaths = [request.root]; destPaths = [];
     renderSources(); renderDestinations(); updateStartButtonState(); showSetupScreen();
     destBtn.focus({ preventScroll: true });
+});
+
+// Auto-updater integration
+const updateBanner = document.getElementById('update-banner');
+const updateBannerTitle = document.getElementById('update-banner-title');
+const updateVersionTag = document.getElementById('update-version-tag');
+const updateBannerDesc = document.getElementById('update-banner-desc');
+const updateProgressWrap = document.getElementById('update-progress-bar-wrap');
+const updateProgressBar = document.getElementById('update-progress-bar');
+const updateActionBtn = document.getElementById('update-action-btn');
+const updateDismissBtn = document.getElementById('update-dismiss-btn');
+const checkUpdatesBtn = document.getElementById('check-updates-btn');
+const updateCheckStatus = document.getElementById('update-check-status');
+const aboutAppVersion = document.getElementById('about-app-version');
+
+if (aboutAppVersion) {
+    aboutAppVersion.textContent = 'SecureCopy';
+}
+
+function handleUpdateStatus(status) {
+    if (!status || !updateBanner) return;
+    if (status.status === 'checking') {
+        if (updateCheckStatus && !updateCheckStatus.hidden) {
+            updateCheckStatus.textContent = 'Controllo aggiornamenti in corso...';
+        }
+    } else if (status.status === 'available') {
+        updateBanner.classList.remove('hidden');
+        if (updateBannerTitle) updateBannerTitle.textContent = 'Aggiornamento disponibile';
+        if (updateVersionTag) updateVersionTag.textContent = '';
+        if (updateBannerDesc) updateBannerDesc.textContent = status.notes || 'Download in background avviato...';
+        if (updateProgressWrap) updateProgressWrap.classList.remove('hidden');
+        if (updateProgressBar) updateProgressBar.style.width = '0%';
+        if (updateActionBtn) updateActionBtn.classList.add('hidden');
+        if (updateCheckStatus) {
+            updateCheckStatus.hidden = false;
+            updateCheckStatus.textContent = 'Nuovo aggiornamento rilevato. Download in corso...';
+        }
+    } else if (status.status === 'downloading') {
+        updateBanner.classList.remove('hidden');
+        if (updateBannerTitle) updateBannerTitle.textContent = 'Scaricamento aggiornamento...';
+        if (updateVersionTag) updateVersionTag.textContent = '';
+        const pct = Math.round((status.progress || 0) * 100);
+        if (updateBannerDesc) updateBannerDesc.textContent = `${pct}% completato`;
+        if (updateProgressWrap) updateProgressWrap.classList.remove('hidden');
+        if (updateProgressBar) updateProgressBar.style.width = `${pct}%`;
+        if (updateActionBtn) updateActionBtn.classList.add('hidden');
+        if (updateCheckStatus) {
+            updateCheckStatus.hidden = false;
+            updateCheckStatus.textContent = `Scaricamento aggiornamento in corso: ${pct}%`;
+        }
+    } else if (status.status === 'installing') {
+        updateBanner.classList.remove('hidden');
+        if (updateBannerTitle) updateBannerTitle.textContent = 'Installazione in corso...';
+        if (updateBannerDesc) updateBannerDesc.textContent = 'Preparazione e verifica dei file in corso...';
+        if (updateProgressBar) updateProgressBar.style.width = '100%';
+        if (updateActionBtn) updateActionBtn.classList.add('hidden');
+    } else if (status.status === 'ready-to-restart') {
+        updateBanner.classList.remove('hidden');
+        if (updateBannerTitle) updateBannerTitle.textContent = 'Aggiornamento pronto!';
+        if (updateVersionTag) updateVersionTag.textContent = '';
+        if (updateBannerDesc) updateBannerDesc.textContent = 'Riavvia SecureCopy per completare l’installazione.';
+        if (updateProgressWrap) updateProgressWrap.classList.add('hidden');
+        if (updateActionBtn) {
+            updateActionBtn.classList.remove('hidden');
+            updateActionBtn.textContent = 'Riavvia ora';
+        }
+        if (updateCheckStatus) {
+            updateCheckStatus.hidden = false;
+            updateCheckStatus.textContent = 'Aggiornamento pronto! Riavvia per applicare.';
+        }
+    } else if (status.status === 'up-to-date') {
+        if (!status.silent && updateCheckStatus) {
+            updateCheckStatus.hidden = false;
+            updateCheckStatus.textContent = 'SecureCopy è aggiornato all’ultima versione.';
+        }
+    } else if (status.status === 'error') {
+        if (!status.silent && updateCheckStatus) {
+            updateCheckStatus.hidden = false;
+            updateCheckStatus.textContent = status.message || 'Errore durante la verifica degli aggiornamenti.';
+        }
+    }
+}
+
+window.electronAPI?.onUpdateStatusChanged?.(handleUpdateStatus);
+
+updateDismissBtn?.addEventListener('click', () => {
+    updateBanner?.classList.add('hidden');
+});
+
+updateActionBtn?.addEventListener('click', async () => {
+    updateActionBtn.disabled = true;
+    updateActionBtn.textContent = 'Riavvio in corso...';
+    try {
+        await window.electronAPI.relaunchApp();
+    } catch (err) {
+        showError(err.message);
+        updateActionBtn.disabled = false;
+        updateActionBtn.textContent = 'Riavvia ora';
+    }
+});
+
+checkUpdatesBtn?.addEventListener('click', async () => {
+    checkUpdatesBtn.disabled = true;
+    if (updateCheckStatus) {
+        updateCheckStatus.hidden = false;
+        updateCheckStatus.textContent = 'Controllo aggiornamenti in corso...';
+    }
+    try {
+        const res = await window.electronAPI.checkForUpdates();
+        handleUpdateStatus(res);
+    } catch (err) {
+        if (updateCheckStatus) {
+            updateCheckStatus.hidden = false;
+            updateCheckStatus.textContent = err.message || 'Errore durante la verifica.';
+        }
+    } finally {
+        checkUpdatesBtn.disabled = false;
+    }
 });

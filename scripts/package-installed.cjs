@@ -45,7 +45,7 @@ const entitlement = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLI
     const info = path.join(target, 'Contents', 'Info.plist');
     const plist = [
       '-c', 'Set :CFBundleIdentifier com.unshapedstudio.securecopy',
-      '-c', 'Set :NSHumanReadableCopyright Copyright © 2026 Unshaped Studio',
+      '-c', 'Set :NSHumanReadableCopyright Copyright © 2026 unshapedstudio',
       '-c', `Set :CFBundleShortVersionString ${metadata.version}`,
       '-c', `Set :CFBundleVersion ${metadata.version}`,
       '-c', `Set :ElectronAsarIntegrity:Resources/app.asar:hash ${hash}`,

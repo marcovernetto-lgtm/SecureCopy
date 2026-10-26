@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cancelCopy: (id) => ipcRenderer.invoke('cancel-copy', id),
     openCopyDestination: (id) => ipcRenderer.invoke('open-copy-destination', id),
     openReport: (id) => ipcRenderer.invoke('open-report', id),
+    exportDITReport: (id) => ipcRenderer.invoke('export-dit-report', id),
     openReportsFolder: () => ipcRenderer.invoke('open-reports-folder'),
     saveActivityLog: messages => ipcRenderer.invoke('save-activity-log', messages),
     // JSON crosses the isolated-world bridge without recursively freezing every result object.
@@ -62,6 +63,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onQueuePaused: (callback) => ipcRenderer.on('queue-paused', () => callback()),
     onQueueResumed: (callback) => ipcRenderer.on('queue-resumed', () => callback()),
     onQueueCleared: (callback) => ipcRenderer.on('queue-cleared', () => callback()),
+
+    // Auto-update
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+    relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
+    getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
+    onUpdateStatusChanged: (callback) => ipcRenderer.on('update-status-changed', (_event, data) => callback(data)),
 
     // Utility functions
     isElectron: true,

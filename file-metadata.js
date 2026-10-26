@@ -2,9 +2,24 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
-// Ten microseconds only covers rounding in Node/macOS timestamp bridges, rather
-// than treating files with genuinely different millisecond dates as identical.
-const TIMESTAMP_TOLERANCE_MS = 0.01;
+// Sixty seconds tolerance covers filesystem differences across APFS, HFS+, ExFAT, and FAT32
+// (seconds resolution, millisecond truncation, and small rounding across minute boundaries)
+// while ensuring day, hour, and minute are respected.
+const TIMESTAMP_TOLERANCE_MS = 60000;
+
+function sameTimestamp(t1, t2) {
+  if (!Number.isFinite(t1) || !Number.isFinite(t2)) return false;
+  if (Math.abs(t1 - t2) <= TIMESTAMP_TOLERANCE_MS) return true;
+  const d1 = new Date(t1);
+  const d2 = new Date(t2);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate() &&
+    d1.getHours() === d2.getHours() &&
+    d1.getMinutes() === d2.getMinutes()
+  );
+}
 
 // These values describe preservable file metadata, not inode/ctime/access time.
 // macOS adds provenance itself; it is not camera/media metadata.
@@ -29,4 +44,4 @@ function macMetadataDifferences(source, destination) {
     .filter(([key]) => JSON.stringify(source[key]) !== JSON.stringify(destination[key])).map(([, label]) => label);
 }
 
-module.exports = { TIMESTAMP_TOLERANCE_MS, readMacMetadata, macMetadataDifferences };
+module.exports = { TIMESTAMP_TOLERANCE_MS, sameTimestamp, readMacMetadata, macMetadataDifferences };

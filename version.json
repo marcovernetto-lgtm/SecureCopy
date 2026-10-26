@@ -1,0 +1,13 @@
+{
+  "version": "2.7.8",
+  "build": 1,
+  "releaseDate": "2026-10-26",
+  "notes": {
+    "it": "Supporto per la copia di singoli file, ottimizzazioni prestazioni e sistema di aggiornamento automatico integrato da GitHub.",
+    "en": "Single-file copy support, performance optimizations, and built-in automatic updates from GitHub."
+  },
+  "downloads": {
+    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.7.8/SecureCopy-2.7.8-arm64.dmg",
+    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.7.8/SecureCopy-2.7.8-x64.dmg"
+  }
+}

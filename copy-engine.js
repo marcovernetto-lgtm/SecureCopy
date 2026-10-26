@@ -7,7 +7,7 @@ const { promisify } = require('util');
 const { pipeline } = require('stream/promises');
 const { snapshot, matches, statOrNull, captureDirectory, assertDirectory } = require('./fs-safety');
 const { setCreationTime } = require('./mac-metadata');
-const { TIMESTAMP_TOLERANCE_MS, readMacMetadata, macMetadataDifferences } = require('./file-metadata');
+const { TIMESTAMP_TOLERANCE_MS, sameTimestamp, readMacMetadata, macMetadataDifferences } = require('./file-metadata');
 const { visibleEntries } = require('./visible-files');
 const { pathSelection } = require('./path-selection');
 
@@ -53,12 +53,14 @@ async function preparePaths(sourceDirs, destination) {
   for (const input of sourceDirs) {
     const source = await fsp.realpath(input);
     const stats = await fsp.stat(source);
-    if (!stats.isDirectory()) throw new Error(`La sorgente non è una cartella: ${input}`);
+    if (!stats.isDirectory() && !stats.isFile()) {
+      throw new Error(`La sorgente non è un file o una cartella valida: ${input}`);
+    }
     const name = path.basename(source);
     const nameKey = (process.platform === 'win32' || process.platform === 'darwin') ? name.toLowerCase() : name;
     if (names.has(nameKey)) throw new Error(`Due sorgenti hanno lo stesso nome finale: ${name}`);
     names.add(nameKey);
-    sources.push({ root: source, name });
+    sources.push({ root: source, name, isFile: stats.isFile(), stats });
   }
 
   const destRoot = await realPathForNewPath(destination);
@@ -132,7 +134,23 @@ async function scanSources(sources, { signal, onLog, onProgress } = {}) {
     onProgress?.({ phase: 'scan', filesFound: files.length, totalBytes });
   }
 
-  for (const source of sources) await visit(source, source.root);
+  for (const source of sources) {
+    if (source.isFile) {
+      cancelled(signal);
+      const lstats = await fsp.lstat(source.root);
+      if (lstats.isSymbolicLink()) {
+        failures.push({ path: source.root, reason: 'Link simbolico non copiato per sicurezza' });
+      } else if (lstats.isFile()) {
+        files.push({ source, path: source.root, relative: '', stats: lstats });
+        totalBytes += lstats.size;
+        onProgress?.({ phase: 'scan', filesFound: files.length, totalBytes });
+      } else {
+        failures.push({ path: source.root, reason: 'Tipo di file non supportato' });
+      }
+    } else {
+      await visit(source, source.root);
+    }
+  }
   failures.forEach(item => onLog?.('WARNING', `${item.path}: ${item.reason}`));
   return { files, directories, failures, totalBytes };
 }
@@ -162,7 +180,7 @@ async function sha256(file, signal, onBytes) {
     await handle.close();
     throw new Error('Il percorso non è un file normale.');
   }
-  const stream = handle.createReadStream({ autoClose: false });
+  const stream = handle.createReadStream({ autoClose: false, highWaterMark: 256 * 1024 });
   const abort = () => stream.destroy(new Error('Operazione annullata'));
   signal?.addEventListener('abort', abort, { once: true });
   try {
@@ -181,9 +199,9 @@ async function sha256(file, signal, onBytes) {
 
 function metadataDifferences(source, dest) {
   const differences = [];
-  if (Math.abs(source.mtimeMs - dest.mtimeMs) > TIMESTAMP_TOLERANCE_MS) differences.push('data di modifica');
+  if (!sameTimestamp(source.mtimeMs, dest.mtimeMs)) differences.push('data di modifica');
   if (process.platform === 'darwin' || process.platform === 'win32') {
-    if (Math.abs(source.birthtimeMs - dest.birthtimeMs) > TIMESTAMP_TOLERANCE_MS) differences.push('data di creazione');
+    if (!sameTimestamp(source.birthtimeMs, dest.birthtimeMs)) differences.push('data di creazione');
   }
   if (process.platform !== 'win32') {
     if ((source.mode & 0o7777) !== (dest.mode & 0o7777)) differences.push('permessi');
@@ -213,7 +231,7 @@ async function optionalMacMetadata(file, signal, allow, onWarning) {
 
 async function copyBytes(source, temp, signal, onBytes, flags = 'wx') {
   let copied = 0;
-  const reader = fs.createReadStream(source, { flags: fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0) });
+  const reader = fs.createReadStream(source, { flags: fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0), highWaterMark: 256 * 1024 });
   reader.on('data', chunk => { copied += chunk.length; onBytes?.(copied); });
   let writer;
   try { writer = fs.createWriteStream(temp, { flags }); await pipeline(reader, writer, { signal }); }
@@ -258,7 +276,7 @@ async function preserveResourceFork(source, target, signal) {
 async function requireCreationDate(destination, sourceStats, hash, signal) {
   if (process.platform !== 'darwin' && process.platform !== 'win32') return;
   const stats = await fsp.lstat(destination);
-  if (Math.abs(stats.birthtimeMs - sourceStats.birthtimeMs) <= TIMESTAMP_TOLERANCE_MS) return;
+  if (sameTimestamp(stats.birthtimeMs, sourceStats.birthtimeMs)) return;
   try {
     if (process.platform === 'darwin') await setCreationTime(destination, sourceStats.birthtimeMs, { signal });
     else throw new Error('Il disco non conserva la data di creazione richiesta.');
@@ -316,7 +334,7 @@ async function publishExclusive(temp, destination, { signal, stats, onOwned, all
   try {
     owned = await handle.stat();
     onOwned(owned);
-    const reader = fs.createReadStream(temp, { flags: fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0) });
+    const reader = fs.createReadStream(temp, { flags: fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0), highWaterMark: 256 * 1024 });
     const abort = () => reader.destroy(new Error('Operazione annullata'));
     signal?.addEventListener('abort', abort, { once: true });
     try {
@@ -380,7 +398,7 @@ async function copyToTemp(source, temp, sourceStats, signal, onBytes, allowMetad
   await preserveMetadata(() => fsp.utimes(temp, sourceStats.atimeMs / 1000, sourceStats.mtimeMs / 1000), 'Date non conservate dal disco.', signal, allowMetadataDifferences, onMetadataWarning);
   if (process.platform === 'darwin') {
     const copiedStats = await fsp.stat(temp);
-    if (Math.abs(sourceStats.birthtimeMs - copiedStats.birthtimeMs) > TIMESTAMP_TOLERANCE_MS) {
+    if (Math.abs(sourceStats.birthtimeMs - copiedStats.birthtimeMs) > 0.01) {
       // ditto can clamp creation time to modification time when the source has a later creation date.
       try {
         await setCreationTime(temp, sourceStats.birthtimeMs, { signal });

@@ -1,9 +1,9 @@
 {
   "name": "secure-copier",
-  "version": "2.7.7",
+  "version": "2.7.8",
   "description": "Copia e verifica file in modo sicuro con checksum SHA-256",
   "main": "main.js",
-  "author": "Unshaped Studio",
+  "author": "unshapedstudio",
   "license": "ISC",
   "devDependencies": {
     "@electron/asar": "4.0.1"
@@ -12,6 +12,7 @@
     "test": "node --test test/*.test.cjs",
     "build:mac": "node scripts/package-installed.cjs",
     "test:electron": "node test/package-metadata-smoke.cjs",
-    "package:mac": "node scripts/package-release.cjs"
+    "package:mac": "node scripts/package-release.cjs",
+    "screenshots": "node scripts/capture-screenshots.cjs"
   }
 }

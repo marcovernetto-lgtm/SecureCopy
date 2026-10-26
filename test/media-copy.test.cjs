@@ -54,7 +54,7 @@ test('unrepresentable creation dates preserve verified media, report a date erro
   const lstat = fs.lstat;
   fs.lstat = async (file, ...args) => {
     const stats = await lstat(file, ...args);
-    if (String(file).startsWith(destDir) && stats.isFile()) stats.birthtimeMs = Math.floor(stats.birthtimeMs / 2000) * 2000;
+    if (String(file).startsWith(destDir) && stats.isFile()) stats.birthtimeMs = stats.birthtimeMs - (2 * 3600 * 1000);
     return stats;
   };
   try {
@@ -87,7 +87,7 @@ test('retry repairs only creation date when contents are already intact', { skip
   const destination = path.join(target, 'photo.CR3');
   const { setCreationTime } = require('../mac-metadata');
   const expected = await fs.stat(file);
-  await setCreationTime(destination, expected.birthtimeMs - 30000);
+  await setCreationTime(destination, expected.birthtimeMs - 120000);
   const before = await fs.stat(destination);
   const result = await runCopy({ sourceDirs: [source], destDir, onlyPaths: ['CARD/photo.CR3'] });
   assert.equal(result.status, 'completed'); assert.equal(result.copied, 0); assert.equal(result.skipped, 1);

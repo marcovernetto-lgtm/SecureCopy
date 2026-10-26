@@ -2,7 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
-const { TIMESTAMP_TOLERANCE_MS } = require('./file-metadata');
+const { TIMESTAMP_TOLERANCE_MS, sameTimestamp } = require('./file-metadata');
 
 const execFileAsync = promisify(execFile);
 // Use the system Foundation bridge: no developer tools, license, shell or
@@ -34,7 +34,7 @@ async function setCreationTime(file, milliseconds, { signal } = {}) {
   if (!after.isFile() || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size) {
     throw new Error('Il file è cambiato durante il ripristino dei metadati.');
   }
-  if (Math.abs(after.birthtimeMs - milliseconds) > TIMESTAMP_TOLERANCE_MS) throw new Error('Il disco di destinazione non conserva la data di creazione richiesta.');
+  if (!sameTimestamp(after.birthtimeMs, milliseconds)) throw new Error('Il disco di destinazione non conserva la data di creazione richiesta.');
 }
 
 module.exports = { setCreationTime };

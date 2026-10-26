@@ -46,6 +46,8 @@
     'Errori': 'Errors',
     'Seleziona visibili': 'Select visible',
     'Deseleziona': 'Clear selection',
+    'Copia e Dischi': 'Copy and Disks',
+    'Sistema e Preferenze': 'System and Preferences',
     'Separa Video, RAW e JPEG': 'Separate Video, RAW and JPEG',
     'Avviso sonoro a fine copia': 'Sound alert on completion',
     'Espulsione automatica disco': 'Auto-eject disk after copy',

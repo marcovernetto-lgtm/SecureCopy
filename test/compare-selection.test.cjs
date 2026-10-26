@@ -79,6 +79,8 @@ function createDOMFixture() {
     const context = {
         document: {
             getElementById,
+            querySelector: () => null,
+            querySelectorAll: () => [],
             createElement: (tag) => createMockElement(tag),
             addEventListener: () => {}
         },

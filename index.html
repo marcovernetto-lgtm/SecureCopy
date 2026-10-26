@@ -71,19 +71,19 @@
     </div>
   </div>
 
-  <!-- Visual Results Dashboard: Status Banner + Integrity Gauge + Proportional Graph + Metric Cards -->
+  <!-- Visual Results Dashboard: Compact Executive Bar -->
   <div id="compare-results-dashboard" class="compare-dashboard glass-panel hidden">
     <div class="dashboard-header">
       <div class="dashboard-status-main">
         <span id="compare-verdict-icon" class="status-indicator-icon">✓</span>
-        <div>
+        <div class="status-text-wrap">
           <h2 id="compare-verdict-title">Tutti i file sono presenti sul disco</h2>
-          <p id="compare-verdict-subtitle">4 verificati corrispondenti · Integrità garantita</p>
+          <span id="compare-verdict-subtitle" class="status-subtitle">4 verificati corrispondenti · Integrità garantita</span>
         </div>
       </div>
       <div class="coverage-gauge">
         <span id="compare-coverage-pct" class="gauge-value">100%</span>
-        <span class="gauge-label">Presenza su disco</span>
+        <span class="gauge-label">Presenza</span>
       </div>
     </div>
 
@@ -98,58 +98,38 @@
 
     <div class="compare-metrics-grid">
       <button type="button" class="metric-card active" data-filter="all" id="card-filter-all">
-        <div class="metric-top">
-          <div class="metric-dot dot-all"></div>
-          <span class="metric-title">Tutti i file</span>
-        </div>
-        <div class="metric-bottom">
-          <strong class="metric-val" id="count-all">0</strong>
-          <span class="metric-bytes" id="bytes-all">0 B</span>
-        </div>
+        <span class="metric-dot dot-all"></span>
+        <span class="metric-title">Tutti</span>
+        <strong class="metric-val" id="count-all">0</strong>
+        <span class="metric-bytes" id="bytes-all">0 B</span>
       </button>
 
       <button type="button" class="metric-card" data-filter="verified" id="card-filter-verified">
-        <div class="metric-top">
-          <div class="metric-dot dot-identical"></div>
-          <span class="metric-title">Identici</span>
-        </div>
-        <div class="metric-bottom">
-          <strong class="metric-val" id="count-identical">0</strong>
-          <span class="metric-bytes" id="bytes-identical">0 B</span>
-        </div>
+        <span class="metric-dot dot-identical"></span>
+        <span class="metric-title">Identici</span>
+        <strong class="metric-val" id="count-identical">0</strong>
+        <span class="metric-bytes" id="bytes-identical">0 B</span>
       </button>
 
       <button type="button" class="metric-card" data-filter="relocated" id="card-filter-relocated">
-        <div class="metric-top">
-          <div class="metric-dot dot-relocated"></div>
-          <span class="metric-title">Altra posizione</span>
-        </div>
-        <div class="metric-bottom">
-          <strong class="metric-val" id="count-relocated">0</strong>
-          <span class="metric-bytes" id="bytes-relocated">0 B</span>
-        </div>
+        <span class="metric-dot dot-relocated"></span>
+        <span class="metric-title">Altra pos.</span>
+        <strong class="metric-val" id="count-relocated">0</strong>
+        <span class="metric-bytes" id="bytes-relocated">0 B</span>
       </button>
 
       <button type="button" class="metric-card" data-filter="missing" id="card-filter-missing">
-        <div class="metric-top">
-          <div class="metric-dot dot-missing"></div>
-          <span class="metric-title">Mancanti</span>
-        </div>
-        <div class="metric-bottom">
-          <strong class="metric-val" id="count-missing">0</strong>
-          <span class="metric-bytes" id="bytes-missing">0 B</span>
-        </div>
+        <span class="metric-dot dot-missing"></span>
+        <span class="metric-title">Mancanti</span>
+        <strong class="metric-val" id="count-missing">0</strong>
+        <span class="metric-bytes" id="bytes-missing">0 B</span>
       </button>
 
       <button type="button" class="metric-card" data-filter="different" id="card-filter-different">
-        <div class="metric-top">
-          <div class="metric-dot dot-different"></div>
-          <span class="metric-title">Diversi</span>
-        </div>
-        <div class="metric-bottom">
-          <strong class="metric-val" id="count-different">0</strong>
-          <span class="metric-bytes" id="bytes-different">0 B</span>
-        </div>
+        <span class="metric-dot dot-different"></span>
+        <span class="metric-title">Diversi</span>
+        <strong class="metric-val" id="count-different">0</strong>
+        <span class="metric-bytes" id="bytes-different">0 B</span>
       </button>
     </div>
   </div>

@@ -1255,6 +1255,7 @@ function setCompareStage(stage) {
     compareStage = stage;
     compareSetupPanel.hidden = stage !== 'setup';
     compareResultsPanel.hidden = stage !== 'results';
+    compareScreen?.classList.toggle('results-stage', stage === 'results');
     document.getElementById('compare-title').textContent = stage === 'setup' ? 'Scegli le cartelle' : 'Analisi e risultati';
     document.getElementById('compare-back-label').textContent = stage === 'setup' ? 'Panoramica' : 'Scelta cartelle';
     compareBackBtn.disabled = stage === 'results' && (compareBusy || comparePreparing);
@@ -1266,9 +1267,9 @@ function hideCompareScreen() {
     } else showHomeScreen();
 }
 function updateCompareActions() {
-    const missingToRight = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable && entry.leftExists) || [];
-    const missingTotal = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable).length || 0;
-    const differentTotal = compareResult?.entries.filter(entry => entry.status === 'different' && entry.copyable).length || 0;
+    const missingToRight = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable && entry.leftExists && entry.leftType !== 'directory') || [];
+    const missingTotal = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable && entry.leftType !== 'directory').length || 0;
+    const differentTotal = compareResult?.entries.filter(entry => entry.status === 'different' && entry.copyable && entry.leftType !== 'directory').length || 0;
     const missingBytes = missingToRight.reduce((acc, e) => acc + (e.leftDetails?.size || 0), 0);
     const choices = compareChoices.size;
 
@@ -1298,7 +1299,7 @@ function updateCompareActions() {
 
     const bulkRight = document.getElementById('compare-bulk-right');
     if (bulkRight) {
-        const missingOnLeft = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable && entry.rightExists) || [];
+        const missingOnLeft = compareResult?.entries.filter(entry => entry.status === 'missing' && entry.copyable && entry.rightExists && entry.rightType !== 'directory') || [];
         if (missingOnLeft.length > 0 && !compareBusy && !comparePreparing) {
             bulkRight.hidden = false;
             bulkRight.disabled = activeCount >= 10;
@@ -1355,6 +1356,8 @@ function resetComparisonAfterSelection() {
     compareRightBtn?.closest('.compare-picker')?.classList.toggle('has-selection', Boolean(compareRight));
     const dashboard = document.getElementById('compare-results-dashboard');
     if (dashboard) dashboard.classList.add('hidden');
+    const progressWrap = document.querySelector?.('.compare-progress-wrap');
+    if (progressWrap) progressWrap.hidden = false;
     document.querySelectorAll('.compare-metrics-grid .metric-card').forEach(c => {
         c.classList.toggle('active', c.dataset.filter === 'all');
     });
@@ -1369,11 +1372,14 @@ function resetComparisonAfterSelection() {
 }
 function renderCompareVerdict() {
     const dashboard = document.getElementById('compare-results-dashboard');
+    const progressWrap = document.querySelector?.('.compare-progress-wrap');
     if (!compareResult) {
         if (dashboard) dashboard.classList.add('hidden');
+        if (progressWrap) progressWrap.hidden = false;
         if (compareVerdictEl) compareVerdictEl.classList.add('hidden');
         return;
     }
+    if (progressWrap) progressWrap.hidden = Boolean(!compareBusy);
 
     const entries = compareResult.entries.map(liveCompareEntry);
     const fileEntries = entries.filter(e => e.leftType !== 'directory' && e.rightType !== 'directory');
@@ -1413,7 +1419,7 @@ function renderCompareVerdict() {
     // Metric Cards Counters and Byte Sizes
     const countAll = document.getElementById('count-all');
     const bytesAll = document.getElementById('bytes-all');
-    if (countAll) countAll.textContent = String(fileEntries.length || entries.length);
+    if (countAll) countAll.textContent = String(fileEntries.length);
     if (bytesAll) bytesAll.textContent = formatBytes(bytesTotal);
 
     const countId = document.getElementById('count-identical');
@@ -1459,10 +1465,10 @@ function renderCompareVerdict() {
     if (verdictSubtitle) {
         if (isPerfect) {
             verdictSubtitle.textContent = relocatedEntries.length > 0
-                ? `${identicalEntries.length} identici · ${relocatedEntries.length} presenti in altra posizione · Integrità verificata`
-                : `${identicalEntries.length} file perfettamente allineati · Integrità garantita`;
+                ? `· ${identicalEntries.length} identici, ${relocatedEntries.length} in altra posizione`
+                : '· Integrità garantita al 100%';
         } else {
-            verdictSubtitle.textContent = `${coverage}% presenza complessiva · ${formatBytes(bytesMissing)} mancanti in destinazione`;
+            verdictSubtitle.textContent = `· ${formatBytes(bytesMissing)} mancanti in destinazione`;
         }
     }
 
@@ -1480,10 +1486,10 @@ function makeCompareRow(entry) {
     row.className = `compare-row ${entry.status}${entry.leftExists && entry.rightExists ? ' present' : ''}`;
     row.dataset.relative = entry.relative;
     row.dataset.presence = entry.leftExists && entry.rightExists ? 'both' : (entry.status === 'relocated' ? 'relocated' : 'missing');
+
     const name = document.createElement('div');
     name.className = 'compare-name';
-    const filename = document.createElement('span');
-    filename.textContent = entry.relative;
+
     if (entry.copyable && entry.status !== 'identical' && entry.status !== 'relocated') {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -1496,54 +1502,58 @@ function makeCompareRow(entry) {
         });
         name.append(checkbox);
     }
-    name.append(filename);
-    const label = document.createElement('span');
-    label.className = 'compare-details';
+
+    const parts = entry.relative.split('/');
+    const basename = parts.pop();
+    const dirname = parts.length ? parts.join('/') + '/' : '';
+
+    const pathWrap = document.createElement('span');
+    pathWrap.className = 'file-path-display';
+    pathWrap.title = entry.relative;
+
+    if (dirname) {
+        const dirEl = document.createElement('span');
+        dirEl.className = 'file-dir-prefix';
+        dirEl.textContent = dirname;
+        pathWrap.append(dirEl);
+    }
+    const baseEl = document.createElement('strong');
+    baseEl.className = 'file-basename';
+    baseEl.textContent = basename;
+    pathWrap.append(baseEl);
+    name.append(pathWrap);
+
+    // Status tag
+    const tag = document.createElement('span');
     if (entry.status === 'relocated') {
-        const badge = document.createElement('span');
-        badge.className = 'badge-relocated';
-        badge.textContent = '⇄ In altra posizione';
+        tag.className = 'row-pill-badge badge-relocated';
         const targetSide = entry.relocatedSide === 'right' ? 'Destinazione' : 'Sorgente';
-        const sub = document.createElement('span');
-        sub.className = 'relocated-subpath';
-        sub.textContent = `↳ Presente in ${targetSide}: ${entry.relocatedPath}`;
-        label.append(badge, sub);
-    } else {
-        label.textContent = compareCopyErrors.has(entry.relative) ? 'Copia da controllare · apri Dettagli' : entry.verified ? 'Copiato e verificato' : entry.created ? 'Cartella creata' : entry.status === 'missing' ? (entry.leftExists ? 'Manca in Destinazione' : 'Manca in Sorgente') : entry.status === 'different' ? 'Diverso' : 'Corrispondente';
-        if (compareCopyErrors.has(entry.relative)) label.classList.add('copy-warning');
+        tag.textContent = `⇄ In ${targetSide}: ${entry.relocatedPath}`;
+        tag.title = `File identico presente in ${targetSide}: ${entry.relocatedPath}`;
+    } else if (entry.status === 'identical') {
+        tag.className = 'row-pill-badge badge-identical';
+        tag.textContent = entry.verified ? '✓ Verificato' : '✓ Identico';
+    } else if (entry.status === 'missing') {
+        tag.className = 'row-pill-badge badge-missing';
+        tag.textContent = entry.leftExists ? 'Manca in Dest.' : 'Manca in Sorg.';
+    } else if (entry.status === 'different') {
+        tag.className = 'row-pill-badge badge-different';
+        tag.textContent = 'Modificato';
     }
-    name.append(label);
-    const details = document.createElement('details');
-    const summary = document.createElement('summary');
-    summary.textContent = 'Dettagli';
-    details.append(summary);
-    const info = document.createElement('p');
-    const baseInfo = [compareCopyErrors.get(entry.relative), ...(entry.warnings || []), ...entry.issues].filter(Boolean);
-    if (entry.status === 'relocated') {
-        baseInfo.unshift(`File identico rilevato in un'altra cartella: ${entry.relocatedPath}`);
+    name.append(tag);
+
+    // File size
+    const size = entry.leftDetails?.size ?? entry.rightDetails?.size;
+    if (size != null) {
+        const sizeEl = document.createElement('span');
+        sizeEl.className = 'file-meta-size';
+        sizeEl.textContent = formatBytes(size);
+        name.append(sizeEl);
     }
-    info.textContent = baseInfo.join(' · ') || 'Nessuna differenza rilevata';
-    details.append(info);
-    for (const [side, data] of [['Sorgente', entry.leftDetails], ['Destinazione', entry.rightDetails]]) {
-        if (!data) continue;
-        const paragraph = document.createElement('p');
-        paragraph.textContent = `${side}: ${data.type} · ${data.size == null ? '—' : formatBytes(data.size)} · ${data.modified == null ? '—' : new Date(data.modified).toLocaleString()}${data.sha256 ? ` · SHA-256: ${data.sha256}` : ''}`;
-        details.append(paragraph);
-    }
-    for (const [side, exists] of [['left', entry.leftExists], ['right', entry.rightExists]]) {
-        if (!exists) continue;
-        const versions = document.createElement('button');
-        versions.className = 'button secondary';
-        versions.textContent = side === 'left' ? 'Versioni sorgente' : 'Versioni destinazione';
-        versions.addEventListener('click', async () => {
-            try { if (!await window.electronAPI.openVersions(entry.relative, side)) showError('Nessuna versione precedente disponibile.'); }
-            catch (error) { showError(error.message); }
-        });
-        details.append(versions);
-    }
-    details.className = 'compare-details';
-    name.append(details);
+
     row.append(name);
+
+    // Presence indicators
     for (const [side, exists] of [['left', entry.leftExists], ['right', entry.rightExists]]) {
         const sideEl = document.createElement('span');
         if (exists) {
@@ -1551,7 +1561,7 @@ function makeCompareRow(entry) {
             sideEl.textContent = '✓';
             sideEl.setAttribute('aria-label', 'Presente');
         } else if (entry.status === 'relocated') {
-            sideEl.className = 'compare-side present';
+            sideEl.className = 'compare-side relocated';
             sideEl.textContent = '⇄';
             sideEl.title = `Presente in: ${entry.relocatedPath}`;
             sideEl.setAttribute('aria-label', 'Presente in altra posizione');
@@ -1562,13 +1572,15 @@ function makeCompareRow(entry) {
         }
         row.append(sideEl);
     }
+
+    // Actions column
     const action = document.createElement('div');
     action.className = 'compare-row-actions';
     if (entry.status !== 'identical' && entry.status !== 'relocated' && entry.copyable) {
         for (const [keep, exists, text] of [['left', entry.leftExists, '→ Destinazione'], ['right', entry.rightExists, '← Sorgente']]) {
             if (!exists) continue;
             const button = document.createElement('button');
-            button.className = 'button secondary';
+            button.className = 'compact-copy-btn';
             button.textContent = text;
             button.disabled = compareBusy || comparePreparing;
             button.title = `Copia ${entry.relative} ${keep === 'left' ? 'da sorgente a destinazione' : 'da destinazione a sorgente'}`;
@@ -1576,17 +1588,26 @@ function makeCompareRow(entry) {
             action.append(button);
         }
     } else {
-        action.textContent = entry.status === 'identical'
-            ? (entry.verified ? '✓ Verificato' : 'Corrispondente')
-            : entry.status === 'relocated'
-                ? '✓ Presente su disco'
-                : 'Verifica manuale';
+        const label = document.createElement('span');
+        if (entry.status === 'identical') {
+            label.className = 'row-status-label ok';
+            label.textContent = entry.verified ? '✓ Verificato' : '✓ Corrispondente';
+        } else if (entry.status === 'relocated') {
+            label.className = 'row-status-label info';
+            label.textContent = '✓ Su disco';
+        } else {
+            label.className = 'row-status-label';
+            label.textContent = 'Verifica manuale';
+        }
+        action.append(label);
     }
     row.append(action);
+
     row.addEventListener('contextmenu', event => {
         event.preventDefault();
         window.electronAPI.showCompareContextMenu(entry.relative);
     });
+
     const progress = compareFileProgress.get(entry.relative);
     if (progress && !entry.verified && !compareCopyErrors.has(entry.relative)) applyFileProgress(row, progress);
     return row;
@@ -1600,6 +1621,8 @@ function renderCompareList() {
     const showIdentical = document.getElementById('compare-show-identical')?.checked ?? true;
 
     const matching = compareResult.entries.map(liveCompareEntry).filter(entry => {
+        if (entry.leftType === 'directory' || entry.rightType === 'directory') return false;
+
         if (statusFilter === 'all') {
             if (entry.status === 'identical' && !showIdentical && !entry.verified && !entry.created && !compareVerified.has(entry.relative)) {
                 return false;

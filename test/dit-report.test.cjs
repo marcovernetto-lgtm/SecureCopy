@@ -92,8 +92,11 @@ test('generateDITReportHTML produces dark-themed DIT report without purple', () 
   assert.ok(html.includes('A001_C001.mov'));
   assert.ok(html.includes('ARRI ALEXA Mini LF'));
   assert.ok(html.includes('Cooke S4/i 35mm'));
-  assert.ok(html.includes('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'));
-  assert.ok(html.includes('Reel A001 · Scena 12 · Take 3'));
+  assert.equal(html.includes('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'), false); // Removed hash code per user request
+  assert.equal(html.includes('Slate DIT'), false); // Removed Slate DIT per user request
+  assert.equal(html.includes('Algoritmo'), false); // Removed Algoritmo per user request
+  assert.ok(html.includes('✓ Verificato'));
+  assert.ok(html.includes('PAGINA 1 DI 1'));
   assert.ok(html.includes('#0c1519')); // Dark background
 
   // Strict user rule: NO PURPLE!
@@ -108,4 +111,51 @@ test('generateDITReportHTML produces dark-themed DIT report without purple', () 
   assert.equal(html.includes('linear-gradient'), false);
   assert.ok(html.includes('margin: 0;'));
   assert.ok(html.includes('v-mark'));
+});
+
+test('generateDITReportHTML filters non-media files and paginates multi-page reports cleanly', () => {
+  const dummyFiles = [];
+  const dummyProbed = [];
+  for (let i = 1; i <= 10; i++) {
+    const num = String(i).padStart(3, '0');
+    dummyFiles.push({
+      path: `A001_C${num}_0824_001.mov`,
+      bytes: 1024 * 1024 * 1024 * i,
+      createdAt: '2026-10-26T10:00:00.000Z',
+      modifiedAt: '2026-10-26T10:00:00.000Z',
+      sha256: 'deadbeef'
+    });
+    dummyProbed.push({
+      resolution: '4K',
+      codec: 'ProRes 4444',
+      fps: '25 fps'
+    });
+  }
+
+  // Include non-media XML and THM sidecars
+  dummyFiles.push({ path: 'clip_metadata.xml', bytes: 2048 });
+  dummyProbed.push({});
+  dummyFiles.push({ path: 'clip_preview.thm', bytes: 8192 });
+  dummyProbed.push({});
+
+  const reportData = {
+    id: 'test-multipage',
+    startedAt: '2026-10-26T10:00:00.000Z',
+    completedAt: '2026-10-26T10:15:00.000Z',
+    sourceDirs: ['/Volumes/CARD'],
+    destination: '/Volumes/RAID',
+    files: dummyFiles
+  };
+
+  const html = generateDITReportHTML(reportData, dummyProbed);
+
+  // Must filter out non-media files
+  assert.equal(html.includes('clip_metadata.xml'), false);
+  assert.equal(html.includes('clip_preview.thm'), false);
+  assert.ok(html.includes('File Trasferiti</span>\n              <div class="stat-val">10</div>'));
+
+  // Multi-page checks: should have page 1 and page 2
+  assert.ok(html.includes('PAGINA 1 DI 2'));
+  assert.ok(html.includes('PAGINA 2 DI 2'));
+  assert.ok(html.includes('subsequent-header'));
 });

@@ -253,6 +253,138 @@ async function probeMediaFile(filePath) {
   return info;
 }
 
+const VIDEO_EXTENSIONS = new Set([
+  '.mov', '.mp4', '.m4v', '.mxf', '.r3d', '.braw', '.ari', '.arx',
+  '.avi', '.mkv', '.crm', '.cine', '.webm', '.flv', '.vob', '.mts', '.m2ts'
+]);
+
+const PHOTO_EXTENSIONS = new Set([
+  '.cr2', '.cr3', '.nef', '.arw', '.dng', '.orf', '.rw2', '.pef',
+  '.raf', '.3fr', '.iiq', '.srw', '.erf', '.mrw', '.kdc', '.mos', '.raw',
+  '.jpg', '.jpeg', '.jpe', '.heic', '.heif', '.hif', '.png', '.webp',
+  '.tiff', '.tif', '.bmp', '.gif'
+]);
+
+function isMediaFile(filePath) {
+  const ext = path.extname(filePath || '').toLowerCase();
+  return VIDEO_EXTENSIONS.has(ext) || PHOTO_EXTENSIONS.has(ext);
+}
+
+let appLogoBase64 = '';
+try {
+  const iconPath = path.join(__dirname, 'Assets/ICON.png');
+  if (fs.existsSync(iconPath)) {
+    appLogoBase64 = `data:image/png;base64,${fs.readFileSync(iconPath).toString('base64')}`;
+  }
+} catch {}
+
+function paginateItems(items) {
+  const total = items.length;
+  if (total <= 6) return [items];
+
+  // Distribute across pages
+  const numSubPages = Math.ceil((total - 5) / 6);
+  const totalPages = 1 + numSubPages;
+  const pages = [];
+  const remaining = [...items];
+
+  if (totalPages === 2) {
+    const page1Count = Math.min(5, Math.ceil(total / 2));
+    pages.push(remaining.splice(0, page1Count));
+    pages.push(remaining);
+    return pages;
+  }
+
+  pages.push(remaining.splice(0, 5));
+  while (remaining.length > 0) {
+    const pagesLeft = totalPages - pages.length;
+    const count = pagesLeft > 0 ? Math.ceil(remaining.length / pagesLeft) : Math.min(remaining.length, 6);
+    pages.push(remaining.splice(0, count));
+  }
+  return pages;
+}
+
+function renderDITCard(file, meta) {
+  const fileSizeStr = formatBytes(file.bytes || 0);
+  const createdStr = formatTimestamp(file.createdAt);
+  const modifiedStr = formatTimestamp(file.modifiedAt);
+  const dirName = path.dirname(file.path || '');
+  const showRelPath = dirName && dirName !== '.' ? `<div class="file-sub-path">${file.path}</div>` : '';
+
+  return `
+    <div class="file-manifest-card">
+      <!-- Colonna Sinistra: Identita File & Anteprima Visiva -->
+      <div class="file-col-left">
+        <div class="file-identity">
+          <div class="file-name-row">
+            <span class="v-mark">✓</span>
+            <strong class="file-name" title="${path.basename(file.path || '')}">${path.basename(file.path || '')}</strong>
+          </div>
+          ${showRelPath}
+          ${meta.thumbnail ? `<div class="file-thumb-wrap"><img src="${meta.thumbnail}" class="file-thumb-img" alt="Thumbnail" /></div>` : ''}
+        </div>
+      </div>
+
+      <!-- Colonna Destra: Specifiche Tecniche Media -->
+      <div class="file-col-right">
+        <div class="specs-grid">
+          <div class="spec-cell">
+            <span class="spec-k">Dimensione</span>
+            <span class="spec-v">${fileSizeStr}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Risoluzione</span>
+            <span class="spec-v">${meta.resolution || '—'}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Frame Rate</span>
+            <span class="spec-v">${meta.fps || '—'}</span>
+          </div>
+
+          <div class="spec-cell">
+            <span class="spec-k">Durata</span>
+            <span class="spec-v">${meta.duration || '—'}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Codec</span>
+            <span class="spec-v spec-codec">${meta.codec || '—'}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Timecode In</span>
+            <span class="spec-v spec-mono">${meta.timecode || '—'}</span>
+          </div>
+
+          <div class="spec-cell">
+            <span class="spec-k">Camera</span>
+            <span class="spec-v">${meta.camera || '—'}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Obiettivo</span>
+            <span class="spec-v">${meta.lens || '—'}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Audio</span>
+            <span class="spec-v">${meta.audio || '—'}</span>
+          </div>
+
+          <div class="spec-cell">
+            <span class="spec-k">Data Creazione</span>
+            <span class="spec-v spec-mono">${createdStr}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Data Modifica</span>
+            <span class="spec-v spec-mono">${modifiedStr}</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-k">Integrità</span>
+            <span class="spec-v spec-verified">✓ Verificato</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function generateDITReportHTML(reportData, probedFiles) {
   const startedStr = formatTimestamp(reportData.startedAt);
   const completedStr = formatTimestamp(reportData.completedAt);
@@ -263,101 +395,127 @@ function generateDITReportHTML(reportData, probedFiles) {
     ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
     : `${durationSec}s`;
 
-  const totalFiles = reportData.summary?.totalFiles || reportData.files?.length || 0;
-  const totalBytes = (reportData.files || []).reduce((acc, f) => acc + (f.bytes || 0), 0);
+  // Include only media files (photos or videos); ignore sidecars/XML
+  const allFiles = reportData.files || [];
+  const mediaIndices = [];
+  allFiles.forEach((file, idx) => {
+    if (isMediaFile(file.path || '')) {
+      mediaIndices.push(idx);
+    }
+  });
+  const targetIndices = mediaIndices.length > 0 ? mediaIndices : allFiles.map((_, i) => i);
+
+  const totalFiles = targetIndices.length;
+  const totalBytes = targetIndices.reduce((acc, idx) => acc + (allFiles[idx].bytes || 0), 0);
   const totalVolumeStr = formatBytes(totalBytes);
   const sourcePath = (reportData.sourceDirs || []).join(', ') || '—';
   const destinationPath = reportData.destination || '—';
 
-  const fileRowsHTML = (reportData.files || []).map((file, index) => {
-    const meta = probedFiles[index] || {};
-    const fileSizeStr = formatBytes(file.bytes || 0);
-    const createdStr = formatTimestamp(file.createdAt);
-    const modifiedStr = formatTimestamp(file.modifiedAt);
-    const hash = file.sha256 || '—';
+  const items = targetIndices.map(idx => ({
+    file: allFiles[idx],
+    meta: (probedFiles && probedFiles[idx]) || {}
+  }));
 
-    // Slate format
-    const slateParts = [];
-    if (meta.reel && meta.reel !== '—') slateParts.push(`Reel ${meta.reel}`);
-    if (meta.scene && meta.scene !== '—') slateParts.push(`Scena ${meta.scene}`);
-    if (meta.take && meta.take !== '—') slateParts.push(`Take ${meta.take}`);
-    const slateStr = slateParts.length ? slateParts.join(' · ') : '—';
+  const pagesData = paginateItems(items);
+  const totalPages = pagesData.length;
 
-    const dirName = path.dirname(file.path || '');
-    const showRelPath = dirName && dirName !== '.' ? `<div class="file-sub-path">${file.path}</div>` : '';
+  const pagesHTML = pagesData.map((pageItems, pageIdx) => {
+    const isFirstPage = pageIdx === 0;
+
+    let topHeaderHTML = '';
+    if (isFirstPage) {
+      topHeaderHTML = `
+        <header class="report-header">
+          <div class="header-top">
+            <div class="brand-wrap">
+              ${appLogoBase64 ? `<img src="${appLogoBase64}" class="brand-logo-img" alt="SecureCopy" />` : `
+              <div class="brand-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="m9 12 2 2 4-4"/>
+                </svg>
+              </div>`}
+              <div class="brand-text">
+                <h1>SECURECOPY</h1>
+                <span>DIT CHECKSUM & MEDIA MANIFEST</span>
+              </div>
+            </div>
+            <div class="header-meta-right">
+              <div>Completato: <strong>${completedStr}</strong></div>
+              <div>Durata: <strong>${durFormatted}</strong></div>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <div class="stat-box">
+              <span class="stat-label">File Trasferiti</span>
+              <div class="stat-val">${totalFiles}</div>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Volume Totale</span>
+              <div class="stat-val">${totalVolumeStr}</div>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Stato Integrità</span>
+              <div class="stat-val accent">✓ 100% VERIFICATO</div>
+            </div>
+          </div>
+
+          <div class="paths-row">
+            <div class="path-block">
+              <span class="path-title">Sorgente</span>
+              <span class="path-str" title="${sourcePath}">${sourcePath}</span>
+            </div>
+            <div class="path-block">
+              <span class="path-title">Destinazione</span>
+              <span class="path-str" title="${destinationPath}">${destinationPath}</span>
+            </div>
+          </div>
+        </header>
+
+        <div class="section-title">
+          <span>Manifest File & Specifiche Tecniche</span>
+        </div>
+      `;
+    } else {
+      topHeaderHTML = `
+        <div class="subsequent-header">
+          <div class="sub-header-left">
+            ${appLogoBase64 ? `<img src="${appLogoBase64}" class="sub-logo-img" alt="Logo" />` : ''}
+            <span class="sub-header-title">SECURECOPY · DIT MEDIA MANIFEST</span>
+          </div>
+          <div class="sub-header-right">
+            <span>PAGINA ${pageIdx + 1} DI ${totalPages}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    const cardsHTML = pageItems.map(item => renderDITCard(item.file, item.meta)).join('');
 
     return `
-      <div class="file-manifest-card">
-        <!-- Colonna Sinistra: Identità File & Checksum -->
-        <div class="file-col-left">
-          <div class="file-identity">
-            <div class="file-name-row">
-              <span class="v-mark">✓</span>
-              <strong class="file-name" title="${path.basename(file.path || '')}">${path.basename(file.path || '')}</strong>
-            </div>
-            ${showRelPath}
-            ${meta.thumbnail ? `<div class="file-thumb-wrap"><img src="${meta.thumbnail}" class="file-thumb-img" alt="Thumbnail" /></div>` : ''}
-          </div>
+      <div class="report-page ${isFirstPage ? 'page-first' : 'page-subsequent'}">
+        <div class="page-top-block">
+          ${topHeaderHTML}
+        </div>
 
-          <div class="hash-box">
-            <div class="hash-label">SHA-256</div>
-            <div class="hash-code">${hash}</div>
+        <div class="page-body">
+          <div class="file-list">
+            ${cardsHTML}
           </div>
         </div>
 
-        <!-- Colonna Destra: Specifiche Tecniche DIT -->
-        <div class="file-col-right">
-          <div class="specs-grid">
-            <div class="spec-cell">
-              <span class="spec-k">Dimensione</span>
-              <span class="spec-v">${fileSizeStr}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Risoluzione</span>
-              <span class="spec-v">${meta.resolution}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Frame Rate</span>
-              <span class="spec-v">${meta.fps}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Durata</span>
-              <span class="spec-v">${meta.duration}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Codec</span>
-              <span class="spec-v spec-codec">${meta.codec}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Timecode In</span>
-              <span class="spec-v spec-mono">${meta.timecode}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Camera</span>
-              <span class="spec-v">${meta.camera}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Slate DIT</span>
-              <span class="spec-v">${slateStr}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Obiettivo</span>
-              <span class="spec-v">${meta.lens}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Audio</span>
-              <span class="spec-v">${meta.audio}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Data Creazione</span>
-              <span class="spec-v spec-mono">${createdStr}</span>
-            </div>
-            <div class="spec-cell">
-              <span class="spec-k">Data Modifica</span>
-              <span class="spec-v spec-mono">${modifiedStr}</span>
-            </div>
+        <footer class="report-footer">
+          <div class="footer-left">
+            Report generato con <strong>SecureCopy</strong> · powered by <strong>unshapedstudio</strong>
           </div>
-        </div>
+          <div class="footer-mid">
+            PAGINA ${pageIdx + 1} DI ${totalPages}
+          </div>
+          <div class="footer-right">
+            VERIFICATION ID: ${reportData.id || '—'}
+          </div>
+        </footer>
       </div>
     `;
   }).join('');
@@ -370,7 +528,7 @@ function generateDITReportHTML(reportData, probedFiles) {
   <style>
     @page {
       size: A4 portrait;
-      margin: 0;
+      margin: 12mm 10mm 12mm 10mm;
     }
     * {
       box-sizing: border-box;
@@ -389,55 +547,62 @@ function generateDITReportHTML(reportData, probedFiles) {
       margin: 0;
       padding: 0;
     }
-    .report-sheet {
+
+    .report-page {
       background-color: #0c1519;
-      padding: 8mm 10mm;
-      box-sizing: border-box;
       width: 100%;
-      min-height: 100vh;
+      height: 273mm;
+      max-height: 273mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .report-page:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
-    /* HEADER BANNER */
+    /* HEADER BANNER (PAGE 1) */
     .report-header {
       background: #10191f;
       border: 1px solid #1a2c35;
       border-radius: 6px;
-      padding: 12px 14px;
-      margin-bottom: 10px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
     }
     .header-top {
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #1a2c35;
-      padding-bottom: 10px;
-      margin-bottom: 10px;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
     }
     .brand-wrap {
       display: flex;
       align-items: center;
       gap: 10px;
     }
-    .brand-icon {
-      width: 26px;
-      height: 26px;
-      background: #081014;
-      border: 1px solid #1a2c35;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #5eead4;
+    .brand-logo-img {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+      border-radius: 6px;
+      flex-shrink: 0;
     }
     .brand-text h1 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 800;
       letter-spacing: 0.8px;
       color: #ffffff;
       line-height: 1.1;
     }
     .brand-text span {
-      font-size: 9px;
+      font-size: 8.5px;
       font-weight: 600;
       color: #5eead4;
       letter-spacing: 0.5px;
@@ -446,7 +611,7 @@ function generateDITReportHTML(reportData, probedFiles) {
     }
     .header-meta-right {
       text-align: right;
-      font-size: 9.5px;
+      font-size: 9px;
       color: #799aa3;
     }
     .header-meta-right strong {
@@ -457,18 +622,18 @@ function generateDITReportHTML(reportData, probedFiles) {
     /* SUMMARY STATS GRID */
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 10px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 6px;
     }
     .stat-box {
       background: #091115;
       border: 1px solid #15242b;
       border-radius: 4px;
-      padding: 6px 10px;
+      padding: 4px 8px;
     }
     .stat-label {
-      font-size: 8px;
+      font-size: 7.5px;
       font-weight: 700;
       color: #5e7d89;
       text-transform: uppercase;
@@ -477,7 +642,7 @@ function generateDITReportHTML(reportData, probedFiles) {
       margin-bottom: 2px;
     }
     .stat-val {
-      font-size: 12px;
+      font-size: 10.5px;
       font-weight: 700;
       color: #ffffff;
       font-family: ui-monospace, Menlo, monospace;
@@ -490,16 +655,16 @@ function generateDITReportHTML(reportData, probedFiles) {
     .paths-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
       background: #091115;
       border: 1px solid #15242b;
       border-radius: 4px;
-      padding: 6px 10px;
+      padding: 4px 8px;
     }
     .path-block {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1.5px;
       min-width: 0;
     }
     .path-title {
@@ -512,20 +677,56 @@ function generateDITReportHTML(reportData, probedFiles) {
     .path-str {
       color: #c9dde2;
       font-family: ui-monospace, Menlo, monospace;
-      font-size: 9px;
+      font-size: 8.5px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
+    /* SUBSEQUENT PAGE HEADER */
+    .subsequent-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1a2c35;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
+    }
+    .sub-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sub-logo-img {
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+    .sub-header-title {
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: #5eead4;
+      font-family: ui-monospace, Menlo, monospace;
+      text-transform: uppercase;
+    }
+    .sub-header-right {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: #799aa3;
+      font-family: ui-monospace, Menlo, monospace;
+      letter-spacing: 0.5px;
+    }
+
     /* SECTION TITLE */
     .section-title {
-      font-size: 9px;
+      font-size: 8.5px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       color: #5eead4;
-      margin: 10px 2px 8px;
+      margin: 6px 2px 8px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -537,72 +738,84 @@ function generateDITReportHTML(reportData, probedFiles) {
       background: #1a2c35;
     }
 
+    /* PAGE BODY & FILE LIST */
+    .page-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center; /* Centering the clip boxes */
+      min-height: 0;
+    }
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     /* FILE MANIFEST CARDS */
     .file-manifest-card {
       background: #10191f;
       border: 1px solid #1a2c35;
       border-radius: 6px;
-      margin-bottom: 8px;
-      padding: 8px 12px;
+      padding: 9px 12px;
       display: grid;
-      grid-template-columns: 31% 69%;
+      grid-template-columns: 28% 72%;
       gap: 12px;
-      page-break-inside: avoid;
-      break-inside: avoid;
       box-sizing: border-box;
-      width: 100%;
+      align-items: center;
     }
 
     /* COLONNA SINISTRA */
     .file-col-left {
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: center;
       border-right: 1px solid #182830;
-      padding-right: 12px;
+      padding-right: 10px;
       min-width: 0;
     }
     .file-identity {
-      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
     .file-name-row {
       display: flex;
-      align-items: baseline;
-      gap: 5px;
+      align-items: flex-start;
+      gap: 6px;
       min-width: 0;
     }
     .v-mark {
       color: #34d399;
-      font-weight: 800;
+      font-weight: 900;
       font-size: 11px;
+      line-height: 1.2;
       flex-shrink: 0;
     }
     .file-name {
-      display: block;
-      font-size: 11px;
+      font-family: ui-monospace, Menlo, monospace;
       font-weight: 700;
+      font-size: 9.5px;
       color: #ffffff;
       word-break: break-all;
       line-height: 1.25;
-      min-width: 0;
     }
     .file-sub-path {
-      display: block;
-      font-size: 8px;
-      color: #6d8b96;
       font-family: ui-monospace, Menlo, monospace;
-      margin-top: 2px;
+      font-size: 7.5px;
+      color: #64828f;
       word-break: break-all;
       line-height: 1.2;
     }
     .file-thumb-wrap {
       margin-top: 5px;
-      width: 68px;
-      height: 40px;
+      width: 80px;
+      height: 46px;
       border-radius: 4px;
       overflow: hidden;
       border: 1px solid #1a2c35;
       background: #081014;
+      flex-shrink: 0;
     }
     .file-thumb-img {
       width: 100%;
@@ -611,172 +824,82 @@ function generateDITReportHTML(reportData, probedFiles) {
       display: block;
     }
 
-    .hash-box {
-      background: #081014;
-      border: 1px solid #142128;
-      border-radius: 4px;
-      padding: 4px 6px;
-      margin-top: 6px;
-    }
-    .hash-label {
-      font-size: 7px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      color: #5eead4;
-      margin-bottom: 2px;
-    }
-    .hash-code {
-      font-family: ui-monospace, Menlo, monospace;
-      font-size: 8px;
-      color: #a7f3d0;
-      word-break: break-all;
-      line-height: 1.25;
-      letter-spacing: 0.2px;
-    }
-
     /* COLONNA DESTRA */
     .file-col-right {
       display: flex;
       flex-direction: column;
       justify-content: center;
       min-width: 0;
-      width: 100%;
     }
     .specs-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 4px 8px;
+      gap: 5px 8px;
       width: 100%;
     }
     .spec-cell {
       min-width: 0;
-      display: flex;
-      flex-direction: column;
+      overflow: hidden;
     }
     .spec-k {
       display: block;
-      font-size: 7.5px;
+      font-size: 7px;
       font-weight: 700;
       color: #5e7d89;
       text-transform: uppercase;
       letter-spacing: 0.35px;
       line-height: 1.1;
-      margin-bottom: 1.5px;
+      margin-bottom: 2px;
     }
     .spec-v {
       display: block;
       font-size: 8.5px;
       font-weight: 600;
       color: #e2edf0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       line-height: 1.25;
-      word-break: break-word;
-    }
-    .spec-codec {
-      color: #5eead4;
-    }
-    .spec-mono {
       font-family: ui-monospace, Menlo, monospace;
-      font-size: 8px;
+    }
+    .spec-v.highlight {
+      color: #5eead4;
+      font-weight: 700;
+    }
+    .spec-verified {
+      color: #34d399;
+      font-weight: 700;
     }
 
     /* FOOTER */
     .report-footer {
-      margin-top: 14px;
-      padding-top: 8px;
-      border-top: 1px solid #1a2c35;
+      border-top: 1px solid #182830;
+      padding-top: 6px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 9px;
+      font-size: 7.5px;
       color: #5e7d89;
+      flex-shrink: 0;
     }
     .footer-left strong {
-      color: #a0bcc4;
+      color: #a0c4ce;
+    }
+    .footer-mid {
+      color: #799aa3;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      font-family: ui-monospace, Menlo, monospace;
     }
     .footer-right {
       font-family: ui-monospace, Menlo, monospace;
-      font-size: 8.5px;
+      font-size: 7.5px;
+      color: #4b6671;
     }
   </style>
 </head>
 <body>
-<div class="report-sheet">
-
-  <!-- HEADER -->
-  <header class="report-header">
-    <div class="header-top">
-      <div class="brand-wrap">
-        <div class="brand-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="m9 12 2 2 4-4"/>
-          </svg>
-        </div>
-        <div class="brand-text">
-          <h1>SECURECOPY</h1>
-          <span>DIT CHECKSUM & MEDIA MANIFEST</span>
-        </div>
-      </div>
-      <div class="header-meta-right">
-        <div>Completato: <strong>${completedStr}</strong></div>
-        <div>Durata: <strong>${durFormatted}</strong></div>
-      </div>
-    </div>
-
-    <!-- METRICS -->
-    <div class="summary-grid">
-      <div class="stat-box">
-        <span class="stat-label">File Trasferiti</span>
-        <div class="stat-val">${totalFiles}</div>
-      </div>
-      <div class="stat-box">
-        <span class="stat-label">Volume Totale</span>
-        <div class="stat-val">${totalVolumeStr}</div>
-      </div>
-      <div class="stat-box">
-        <span class="stat-label">Algoritmo</span>
-        <div class="stat-val">SHA-256</div>
-      </div>
-      <div class="stat-box">
-        <span class="stat-label">Stato Integrità</span>
-        <div class="stat-val accent">✓ 100% VERIFICATO</div>
-      </div>
-    </div>
-
-    <!-- PATHS -->
-    <div class="paths-row">
-      <div class="path-block">
-        <span class="path-title">Sorgente</span>
-        <span class="path-str" title="${sourcePath}">${sourcePath}</span>
-      </div>
-      <div class="path-block">
-        <span class="path-title">Destinazione</span>
-        <span class="path-str" title="${destinationPath}">${destinationPath}</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- SECTION TITLE -->
-  <div class="section-title">
-    <span>Manifest File & Specifiche Tecniche</span>
-  </div>
-
-  <!-- FILE LIST -->
-  <div class="file-list">
-    ${fileRowsHTML}
-  </div>
-
-  <!-- FOOTER -->
-  <footer class="report-footer">
-    <div class="footer-left">
-      Report generato con <strong>SecureCopy</strong> · powered by <strong>unshapedstudio</strong>
-    </div>
-    <div class="footer-right">
-      VERIFICATION ID: ${reportData.id || '—'}
-    </div>
-  </footer>
-
-</div>
+${pagesHTML}
 </body>
 </html>`;
 }
@@ -794,7 +917,7 @@ async function exportDITReportPDF(reportData, BrowserWindow, shell, reportsDirec
     const chunk = reportData.files.slice(i, i + concurrency);
     const chunkResults = await Promise.all(chunk.map(async file => {
       const fullPath = destinationRoot && file.path ? path.resolve(destinationRoot, file.path) : '';
-      if (fullPath && fs.existsSync(fullPath)) {
+      if (isMediaFile(file.path) && fullPath && fs.existsSync(fullPath)) {
         return await probeMediaFile(fullPath);
       }
       return {

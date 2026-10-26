@@ -60,10 +60,32 @@ async function extractVideoThumbnail(filePath) {
       '-ss', '00:00:01',
       '-i', filePath,
       '-vframes', '1',
-      '-vf', 'scale=140:-1',
-      '-q:v', '4',
+      '-vf', 'scale=220:-1',
+      '-q:v', '5',
       '-y',
       tmpThumb
+    ], { timeout: 3000 });
+    const buf = await fsp.readFile(tmpThumb);
+    return `data:image/jpeg;base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  } finally {
+    await fsp.unlink(tmpThumb).catch(() => {});
+  }
+}
+
+async function extractPhotoThumbnail(filePath) {
+  if (process.platform !== 'darwin') return null;
+  const os = require('os');
+  const crypto = require('crypto');
+  const tmpThumb = path.join(os.tmpdir(), `sc-pthumb-${crypto.randomUUID()}.jpg`);
+  try {
+    await execFileAsync('/usr/bin/sips', [
+      '-s', 'format', 'jpeg',
+      '-s', 'formatOptions', '70',
+      '-Z', '220',
+      filePath,
+      '--out', tmpThumb
     ], { timeout: 3000 });
     const buf = await fsp.readFile(tmpThumb);
     return `data:image/jpeg;base64,${buf.toString('base64')}`;
@@ -250,6 +272,13 @@ async function probeMediaFile(filePath) {
     }
   }
 
+  const ext = path.extname(filePath || '').toLowerCase();
+  if (!info.thumbnail && PHOTO_EXTENSIONS.has(ext)) {
+    try {
+      info.thumbnail = await extractPhotoThumbnail(filePath);
+    } catch {}
+  }
+
   return info;
 }
 
@@ -272,7 +301,9 @@ function isMediaFile(filePath) {
 
 let appLogoBase64 = '';
 try {
-  const iconPath = path.join(__dirname, 'Assets/ICON.png');
+  const iconReportPath = path.join(__dirname, 'Assets/icon-report.png');
+  const iconFallbackPath = path.join(__dirname, 'Assets/ICON.png');
+  const iconPath = fs.existsSync(iconReportPath) ? iconReportPath : iconFallbackPath;
   if (fs.existsSync(iconPath)) {
     appLogoBase64 = `data:image/png;base64,${fs.readFileSync(iconPath).toString('base64')}`;
   }
@@ -280,25 +311,28 @@ try {
 
 function paginateItems(items) {
   const total = items.length;
-  if (total <= 6) return [items];
+  // Page 1 capacity: 8 items
+  // Subsequent pages capacity: 11 items
+  if (total <= 8) return [items];
 
-  // Distribute across pages
-  const numSubPages = Math.ceil((total - 5) / 6);
-  const totalPages = 1 + numSubPages;
-  const pages = [];
   const remaining = [...items];
+  const pages = [];
 
-  if (totalPages === 2) {
-    const page1Count = Math.min(5, Math.ceil(total / 2));
-    pages.push(remaining.splice(0, page1Count));
+  // If total <= 16, split nicely between 2 pages
+  if (total <= 16) {
+    const p1Count = Math.min(8, Math.ceil(total / 2));
+    pages.push(remaining.splice(0, p1Count));
     pages.push(remaining);
     return pages;
   }
 
-  pages.push(remaining.splice(0, 5));
+  // 3+ pages: Page 1 gets 8, sub-pages get up to 11
+  const numSubPages = Math.ceil((total - 8) / 11);
+  const totalPages = 1 + numSubPages;
+  pages.push(remaining.splice(0, 8));
   while (remaining.length > 0) {
     const pagesLeft = totalPages - pages.length;
-    const count = pagesLeft > 0 ? Math.ceil(remaining.length / pagesLeft) : Math.min(remaining.length, 6);
+    const count = pagesLeft > 0 ? Math.ceil(remaining.length / pagesLeft) : Math.min(remaining.length, 11);
     pages.push(remaining.splice(0, count));
   }
   return pages;
@@ -307,31 +341,41 @@ function paginateItems(items) {
 function renderDITCard(file, meta) {
   const fileSizeStr = formatBytes(file.bytes || 0);
   const createdStr = formatTimestamp(file.createdAt);
-  const modifiedStr = formatTimestamp(file.modifiedAt);
   const dirName = path.dirname(file.path || '');
-  const showRelPath = dirName && dirName !== '.' ? `<div class="file-sub-path">${file.path}</div>` : '';
+  const showRelPath = dirName && dirName !== '.' ? `<span class="card-path" title="${file.path}">${file.path}</span>` : '';
 
   return `
     <div class="file-manifest-card">
-      <!-- Colonna Sinistra: Identita File & Anteprima Visiva -->
-      <div class="file-col-left">
-        <div class="file-identity">
-          <div class="file-name-row">
-            <span class="v-mark">✓</span>
-            <strong class="file-name" title="${path.basename(file.path || '')}">${path.basename(file.path || '')}</strong>
-          </div>
-          ${showRelPath}
-          ${meta.thumbnail ? `<div class="file-thumb-wrap"><img src="${meta.thumbnail}" class="file-thumb-img" alt="Thumbnail" /></div>` : ''}
-        </div>
+      <!-- Thumbnail a sinistra, più grande (106x60) -->
+      <div class="card-thumb-col">
+        ${meta.thumbnail ? `
+          <div class="file-thumb-wrap">
+            <img src="${meta.thumbnail}" class="file-thumb-img" alt="Preview" />
+          </div>` : `
+          <div class="file-thumb-wrap file-thumb-empty">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3d5a66" stroke-width="1.5">
+              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+              <line x1="7" y1="2" x2="7" y2="22"/>
+              <line x1="17" y1="2" x2="17" y2="22"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+            </svg>
+          </div>`}
       </div>
 
-      <!-- Colonna Destra: Specifiche Tecniche Media -->
-      <div class="file-col-right">
-        <div class="specs-grid">
-          <div class="spec-cell">
-            <span class="spec-k">Dimensione</span>
-            <span class="spec-v">${fileSizeStr}</span>
+      <!-- Dati e specifiche a destra, compatti su 2 righe -->
+      <div class="card-content-col">
+        <!-- Barra Titolo con Nome, Path e Dimensione -->
+        <div class="card-header-line">
+          <div class="card-title-group">
+            <span class="v-mark">✓</span>
+            <strong class="file-name" title="${path.basename(file.path || '')}">${path.basename(file.path || '')}</strong>
+            ${showRelPath}
           </div>
+          <div class="card-size-badge">${fileSizeStr}</div>
+        </div>
+
+        <!-- Griglia Specifiche: 5 Colonne × 2 Righe -->
+        <div class="specs-grid">
           <div class="spec-cell">
             <span class="spec-k">Risoluzione</span>
             <span class="spec-v">${meta.resolution || '—'}</span>
@@ -340,7 +384,6 @@ function renderDITCard(file, meta) {
             <span class="spec-k">Frame Rate</span>
             <span class="spec-v">${meta.fps || '—'}</span>
           </div>
-
           <div class="spec-cell">
             <span class="spec-k">Durata</span>
             <span class="spec-v">${meta.duration || '—'}</span>
@@ -350,7 +393,7 @@ function renderDITCard(file, meta) {
             <span class="spec-v spec-codec">${meta.codec || '—'}</span>
           </div>
           <div class="spec-cell">
-            <span class="spec-k">Timecode In</span>
+            <span class="spec-k">Timecode</span>
             <span class="spec-v spec-mono">${meta.timecode || '—'}</span>
           </div>
 
@@ -366,14 +409,9 @@ function renderDITCard(file, meta) {
             <span class="spec-k">Audio</span>
             <span class="spec-v">${meta.audio || '—'}</span>
           </div>
-
           <div class="spec-cell">
-            <span class="spec-k">Data Creazione</span>
+            <span class="spec-k">Data</span>
             <span class="spec-v spec-mono">${createdStr}</span>
-          </div>
-          <div class="spec-cell">
-            <span class="spec-k">Data Modifica</span>
-            <span class="spec-v spec-mono">${modifiedStr}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Integrità</span>
@@ -404,7 +442,6 @@ function generateDITReportHTML(reportData, probedFiles) {
     }
   });
   const targetIndices = mediaIndices.length > 0 ? mediaIndices : allFiles.map((_, i) => i);
-
   const totalFiles = targetIndices.length;
   const totalBytes = targetIndices.reduce((acc, idx) => acc + (allFiles[idx].bytes || 0), 0);
   const totalVolumeStr = formatBytes(totalBytes);
@@ -428,13 +465,7 @@ function generateDITReportHTML(reportData, probedFiles) {
         <header class="report-header">
           <div class="header-top">
             <div class="brand-wrap">
-              ${appLogoBase64 ? `<img src="${appLogoBase64}" class="brand-logo-img" alt="SecureCopy" />` : `
-              <div class="brand-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  <path d="m9 12 2 2 4-4"/>
-                </svg>
-              </div>`}
+              ${appLogoBase64 ? `<img src="${appLogoBase64}" class="brand-logo-img" alt="SecureCopy" />` : ''}
               <div class="brand-text">
                 <h1>SECURECOPY</h1>
                 <span>DIT CHECKSUM & MEDIA MANIFEST</span>
@@ -542,7 +573,7 @@ function generateDITReportHTML(reportData, probedFiles) {
       color: #e2edf0;
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
       font-size: 10px;
-      line-height: 1.35;
+      line-height: 1.3;
       width: 100%;
       margin: 0;
       padding: 0;
@@ -571,38 +602,38 @@ function generateDITReportHTML(reportData, probedFiles) {
       background: #10191f;
       border: 1px solid #1a2c35;
       border-radius: 6px;
-      padding: 8px 12px;
-      margin-bottom: 8px;
+      padding: 7px 12px;
+      margin-bottom: 6px;
     }
     .header-top {
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #1a2c35;
-      padding-bottom: 6px;
-      margin-bottom: 6px;
+      padding-bottom: 5px;
+      margin-bottom: 5px;
     }
     .brand-wrap {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 9px;
     }
     .brand-logo-img {
-      width: 30px;
-      height: 30px;
+      width: 28px;
+      height: 28px;
       object-fit: contain;
-      border-radius: 6px;
+      border-radius: 5px;
       flex-shrink: 0;
     }
     .brand-text h1 {
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 800;
       letter-spacing: 0.8px;
       color: #ffffff;
       line-height: 1.1;
     }
     .brand-text span {
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: 600;
       color: #5eead4;
       letter-spacing: 0.5px;
@@ -611,7 +642,7 @@ function generateDITReportHTML(reportData, probedFiles) {
     }
     .header-meta-right {
       text-align: right;
-      font-size: 9px;
+      font-size: 8.5px;
       color: #799aa3;
     }
     .header-meta-right strong {
@@ -624,25 +655,25 @@ function generateDITReportHTML(reportData, probedFiles) {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 6px;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
     .stat-box {
       background: #091115;
       border: 1px solid #15242b;
       border-radius: 4px;
-      padding: 4px 8px;
+      padding: 3px 7px;
     }
     .stat-label {
-      font-size: 7.5px;
+      font-size: 7px;
       font-weight: 700;
       color: #5e7d89;
       text-transform: uppercase;
       letter-spacing: 0.35px;
       display: block;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     .stat-val {
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 700;
       color: #ffffff;
       font-family: ui-monospace, Menlo, monospace;
@@ -659,16 +690,16 @@ function generateDITReportHTML(reportData, probedFiles) {
       background: #091115;
       border: 1px solid #15242b;
       border-radius: 4px;
-      padding: 4px 8px;
+      padding: 3px 7px;
     }
     .path-block {
       display: flex;
       flex-direction: column;
-      gap: 1.5px;
+      gap: 1px;
       min-width: 0;
     }
     .path-title {
-      font-size: 7.5px;
+      font-size: 7px;
       font-weight: 700;
       color: #5e7d89;
       text-transform: uppercase;
@@ -677,7 +708,7 @@ function generateDITReportHTML(reportData, probedFiles) {
     .path-str {
       color: #c9dde2;
       font-family: ui-monospace, Menlo, monospace;
-      font-size: 8.5px;
+      font-size: 8px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -689,13 +720,13 @@ function generateDITReportHTML(reportData, probedFiles) {
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #1a2c35;
-      padding-bottom: 6px;
+      padding-bottom: 5px;
       margin-bottom: 8px;
     }
     .sub-header-left {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
     }
     .sub-logo-img {
       width: 18px;
@@ -704,7 +735,7 @@ function generateDITReportHTML(reportData, probedFiles) {
       border-radius: 4px;
     }
     .sub-header-title {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 800;
       letter-spacing: 0.8px;
       color: #5eead4;
@@ -712,7 +743,7 @@ function generateDITReportHTML(reportData, probedFiles) {
       text-transform: uppercase;
     }
     .sub-header-right {
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: 700;
       color: #799aa3;
       font-family: ui-monospace, Menlo, monospace;
@@ -721,12 +752,12 @@ function generateDITReportHTML(reportData, probedFiles) {
 
     /* SECTION TITLE */
     .section-title {
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       color: #5eead4;
-      margin: 6px 2px 8px;
+      margin: 5px 2px 6px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -743,79 +774,41 @@ function generateDITReportHTML(reportData, probedFiles) {
       flex: 1;
       display: flex;
       flex-direction: column;
-      justify-content: center; /* Centering the clip boxes */
+      justify-content: center;
       min-height: 0;
     }
     .file-list {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 6px;
     }
 
-    /* FILE MANIFEST CARDS */
+    /* FILE MANIFEST CARD (COMPATTO & ANTEPRIMA PIÙ GRANDE) */
     .file-manifest-card {
       background: #10191f;
       border: 1px solid #1a2c35;
-      border-radius: 6px;
-      padding: 9px 12px;
-      display: grid;
-      grid-template-columns: 28% 72%;
+      border-radius: 5px;
+      padding: 6px 10px;
+      display: flex;
       gap: 12px;
       box-sizing: border-box;
       align-items: center;
     }
 
-    /* COLONNA SINISTRA */
-    .file-col-left {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      border-right: 1px solid #182830;
-      padding-right: 10px;
-      min-width: 0;
-    }
-    .file-identity {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .file-name-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      min-width: 0;
-    }
-    .v-mark {
-      color: #34d399;
-      font-weight: 900;
-      font-size: 11px;
-      line-height: 1.2;
+    /* COLONNA ANTEPRIMA (106px × 60px) */
+    .card-thumb-col {
       flex-shrink: 0;
-    }
-    .file-name {
-      font-family: ui-monospace, Menlo, monospace;
-      font-weight: 700;
-      font-size: 9.5px;
-      color: #ffffff;
-      word-break: break-all;
-      line-height: 1.25;
-    }
-    .file-sub-path {
-      font-family: ui-monospace, Menlo, monospace;
-      font-size: 7.5px;
-      color: #64828f;
-      word-break: break-all;
-      line-height: 1.2;
     }
     .file-thumb-wrap {
-      margin-top: 5px;
-      width: 80px;
-      height: 46px;
+      width: 106px;
+      height: 60px;
       border-radius: 4px;
       overflow: hidden;
-      border: 1px solid #1a2c35;
+      border: 1px solid #1d313b;
       background: #081014;
-      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .file-thumb-img {
       width: 100%;
@@ -823,18 +816,77 @@ function generateDITReportHTML(reportData, probedFiles) {
       object-fit: cover;
       display: block;
     }
+    .file-thumb-empty {
+      background: #091318;
+    }
 
-    /* COLONNA DESTRA */
-    .file-col-right {
+    /* COLONNA DATI & SPECIFICHE */
+    .card-content-col {
+      flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      min-width: 0;
+      gap: 4px;
     }
+
+    /* HEADER RIGA NOME & BADGE */
+    .card-header-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #16242c;
+      padding-bottom: 3px;
+    }
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .v-mark {
+      color: #34d399;
+      font-weight: 900;
+      font-size: 10.5px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .file-name {
+      font-family: ui-monospace, Menlo, monospace;
+      font-weight: 700;
+      font-size: 9.5px;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-path {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 7.5px;
+      color: #64828f;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-size-badge {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 8.5px;
+      font-weight: 700;
+      color: #c9dde2;
+      background: #091115;
+      border: 1px solid #17272f;
+      padding: 1px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* GRIGLIA SPECIFICHE 5 COLONNE × 2 RIGHE */
     .specs-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 5px 8px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 3px 8px;
       width: 100%;
     }
     .spec-cell {
@@ -843,28 +895,32 @@ function generateDITReportHTML(reportData, probedFiles) {
     }
     .spec-k {
       display: block;
-      font-size: 7px;
+      font-size: 6.5px;
       font-weight: 700;
       color: #5e7d89;
       text-transform: uppercase;
-      letter-spacing: 0.35px;
-      line-height: 1.1;
-      margin-bottom: 2px;
+      letter-spacing: 0.3px;
+      line-height: 1;
+      margin-bottom: 1px;
     }
     .spec-v {
       display: block;
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: 600;
       color: #e2edf0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 1.25;
+      line-height: 1.15;
       font-family: ui-monospace, Menlo, monospace;
     }
-    .spec-v.highlight {
+    .spec-codec {
       color: #5eead4;
       font-weight: 700;
+    }
+    .spec-mono {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 7.5px;
     }
     .spec-verified {
       color: #34d399;
@@ -874,7 +930,7 @@ function generateDITReportHTML(reportData, probedFiles) {
     /* FOOTER */
     .report-footer {
       border-top: 1px solid #182830;
-      padding-top: 6px;
+      padding-top: 5px;
       display: flex;
       justify-content: space-between;
       align-items: center;

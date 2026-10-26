@@ -574,12 +574,12 @@ async function finishJob(item, report) {
   send('copy-finished', { ...item.result, id: item.id, description: item.description });
   sendLog(report.status === 'completed' ? 'COMPLETE' : 'WARNING',
     `${item.description}: ${report.status}, ${item.filesCopied} copiati, ${item.filesSkipped} già validi, ${item.filesFailed} problemi.`);
-  if (report.status === 'completed') send('play-completion-sound', 'Assets/SOUND.mp3');
-  if (mediaSettings.soundAlerts !== false && process.platform === 'darwin') {
-    const sound = report.status === 'completed' && (!report.failures || !report.failures.length)
-      ? '/System/Library/Sounds/Glass.aiff'
-      : '/System/Library/Sounds/Sosumi.aiff';
-    require('child_process').execFile('/usr/bin/afplay', [sound], () => {});
+  if (mediaSettings.soundAlerts !== false) {
+    if (report.status === 'completed' && (!report.failures || !report.failures.length)) {
+      send('play-completion-sound', 'Assets/SOUND.mp3');
+    } else if (process.platform === 'darwin') {
+      require('child_process').execFile('/usr/bin/afplay', ['/System/Library/Sounds/Sosumi.aiff'], () => {});
+    }
   }
   if (mediaSettings.autoEject === true && report.status === 'completed' && (!report.failures || !report.failures.length) && process.platform === 'darwin') {
     for (const src of (item.sourceDirs || [])) {

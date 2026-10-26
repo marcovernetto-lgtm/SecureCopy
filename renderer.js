@@ -2136,12 +2136,13 @@ const telegramEnabledToggle = document.getElementById('telegram-enabled');
 const telegramConfigPanel = document.getElementById('telegram-config-panel');
 const telegramGuideBox = document.getElementById('telegram-guide-box');
 const telegramToggleGuideBtn = document.getElementById('telegram-toggle-guide-btn');
-const telegramStatusBadge = document.getElementById('telegram-status-badge');
+const telegramStatusDot = document.getElementById('telegram-status-dot');
 const telegramBotTokenInput = document.getElementById('telegram-bot-token');
 const telegramChatIdInput = document.getElementById('telegram-chat-id');
 const telegramDetectBtn = document.getElementById('telegram-detect-btn');
 const telegramTestBtn = document.getElementById('telegram-test-btn');
 const telegramStatusMsg = document.getElementById('telegram-status-msg');
+const reportRetentionSelect = document.getElementById('report-retention-select');
 
 let isTokenApiInvalid = false;
 let userToggledGuide = false;
@@ -2179,10 +2180,44 @@ function updateTelegramTutorialVisibility() {
         telegramToggleGuideBtn.textContent = userToggledGuide ? 'Nascondi guida' : 'Mostra guida';
     }
 
-    if (telegramStatusBadge) {
+    if (telegramStatusDot) {
         const isEnabled = !!telegramEnabledToggle?.checked;
-        telegramStatusBadge.style.display = (isEnabled && isConfiguredCorrectly) ? 'inline-block' : 'none';
+        telegramStatusDot.className = 'settings-status-dot';
+        if (!isEnabled) {
+            telegramStatusDot.classList.add('dot-inactive');
+            telegramStatusDot.title = 'Notifiche disattivate';
+        } else if (isTokenIncorrect) {
+            telegramStatusDot.classList.add('dot-error');
+            telegramStatusDot.title = 'Bot token non valido';
+        } else if (isConfiguredCorrectly) {
+            telegramStatusDot.classList.add('dot-active');
+            telegramStatusDot.title = 'Bot configurato e attivo';
+        } else {
+            telegramStatusDot.classList.add('dot-inactive');
+            telegramStatusDot.title = 'In attesa di configurazione';
+        }
     }
+}
+
+const reportRetentionLegacy = document.getElementById('report-retention');
+
+function updateRetentionUI(days) {
+    if (reportRetentionSelect && days) reportRetentionSelect.value = String(days);
+    if (reportRetentionLegacy && days) reportRetentionLegacy.textContent = `${days} giorni`;
+}
+
+window.electronAPI?.getReportRetention?.().then(updateRetentionUI).catch(console.error);
+
+if (reportRetentionSelect) {
+    reportRetentionSelect.addEventListener('change', async () => {
+        const days = Number(reportRetentionSelect.value);
+        try {
+            const saved = await window.electronAPI?.setReportRetention?.(days);
+            updateRetentionUI(saved || days);
+        } catch (error) {
+            showError(error.message);
+        }
+    });
 }
 
 if (telegramToggleGuideBtn) {

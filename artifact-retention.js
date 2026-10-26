@@ -47,9 +47,9 @@ function generatedAt(name, content) {
   return marker && marker[1] === log[1] ? Date.parse(marker[2]) : null;
 }
 
-async function cleanupArtifacts(userData, { now = Date.now() } = {}) {
+async function cleanupArtifacts(userData, { now = Date.now(), days = RETENTION_DAYS } = {}) {
   const removed = [];
-  const cutoff = now - RETENTION_DAYS * 86400000;
+  const cutoff = now - days * 86400000;
   for (const kind of ['reports', 'logs']) {
     let managed;
     try { managed = await managedDirectory(userData, kind); }

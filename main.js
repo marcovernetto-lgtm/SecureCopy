@@ -42,7 +42,7 @@ let uiLanguage = 'it';
 let comparisonRecovery = null;
 let recoveryStore = null;
 let lastRecoveryWrite = 0;
-const reportRetentionDays = RETENTION_DAYS;
+let reportRetentionDays = RETENTION_DAYS;
 let retentionTimer = null;
 let mediaSettings = {
   mediaSeparation: false,
@@ -157,7 +157,7 @@ function restoreQueue() {
 }
 async function applyReportRetention() {
   if (retentionTask) return retentionTask;
-  retentionTask = cleanupArtifacts(app.getPath('userData')).then(removed => {
+  retentionTask = cleanupArtifacts(app.getPath('userData'), { days: reportRetentionDays }).then(removed => {
     for (const file of removed) {
       for (const [id, saved] of completedReports) if (saved === file) completedReports.delete(id);
       for (const job of completedJobs) if (job.result?.reportPath === file) job.result.reportPath = null;
@@ -254,9 +254,22 @@ app.whenReady().then(async () => {
   try {
     const root = app.getPath('userData');
     if (await fs.promises.realpath(root) !== path.resolve(root)) throw new Error('Cartella dati non sicura.');
-    const temp = path.join(root, `report-retention-${crypto.randomUUID()}.tmp`);
-    await fs.promises.writeFile(temp, JSON.stringify({ days: RETENTION_DAYS }), { mode: 0o600, flag: 'wx' });
-    await fs.promises.rename(temp, path.join(root, 'report-retention.json'));
+    const retentionFile = path.join(root, 'report-retention.json');
+    let loadedDays = RETENTION_DAYS;
+    try {
+      const data = JSON.parse(await fs.promises.readFile(retentionFile, 'utf8'));
+      const parsed = Number(data.days);
+      if ([2, 5, 10, 20, 30].includes(parsed)) {
+        loadedDays = parsed;
+      } else {
+        throw new Error('Valore conservazione non valido');
+      }
+    } catch {
+      const temp = path.join(root, `report-retention-${crypto.randomUUID()}.tmp`);
+      await fs.promises.writeFile(temp, JSON.stringify({ days: RETENTION_DAYS }), { mode: 0o600, flag: 'wx' });
+      await fs.promises.rename(temp, retentionFile);
+    }
+    reportRetentionDays = loadedDays;
   }
   catch (error) { console.error('Impostazione conservazione:', error.message); }
   try { await applyReportRetention(); } catch (error) { console.error('Conservazione report:', error.message); }
@@ -346,14 +359,19 @@ handle('get-background-settings', () => backgroundService.getSettings());
 handle('set-login-startup', enabled => backgroundService.setLogin(enabled));
 handle('set-disk-notices', enabled => backgroundService.setDiskNotices(enabled));
 handle('set-report-retention', async days => {
-  if (days !== RETENTION_DAYS) throw new Error('Report e log vengono conservati per 20 giorni.');
-  const file = path.join(app.getPath('userData'),'report-retention.json');
+  const validDays = [2, 5, 10, 20, 30];
+  const parsed = Number(days);
+  if (!validDays.includes(parsed)) {
+    throw new Error('I valori supportati per la conservazione sono 2, 5, 10, 20 o 30 giorni.');
+  }
+  reportRetentionDays = parsed;
+  const file = path.join(app.getPath('userData'), 'report-retention.json');
   const temp = `${file}.${crypto.randomUUID()}.tmp`;
-  await fs.promises.writeFile(temp,JSON.stringify({days}),{mode:0o600,flag:'wx'});
-  await fs.promises.rename(temp,file);
+  await fs.promises.writeFile(temp, JSON.stringify({ days: parsed }), { mode: 0o600, flag: 'wx' });
+  await fs.promises.rename(temp, file);
   await applyReportRetention();
   updateQueue();
-  return days;
+  return reportRetentionDays;
 });
 handle('save-activity-log', async messages => {
   const file = await saveActivityLog(app.getPath('userData'), messages);

@@ -238,32 +238,39 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 .settings-column { display: flex; flex-direction: column; min-width: 0; text-align: left; }
 .settings-column .settings-group-header:first-child { margin-top: 0; }
 .settings-full-group { margin-top: 10px; text-align: left; }
-.settings-full-group .settings-group-header { margin: 0 4px 5px; }
-.settings-group-header { margin: 10px 4px 5px; text-align: left; }
-.settings-group-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: #5eead4; }
-.settings-group { background: rgba(10,19,23,.65); border: 1px solid rgba(255,255,255,.07); border-radius: 12px; overflow: hidden; }
-.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; gap: 12px; min-height: 38px; border-bottom: 1px solid rgba(255,255,255,.045); transition: background .15s; }
+.settings-full-group .settings-group-header { margin: 0 4px 6px; }
+.settings-group-header { margin: 10px 4px 6px; display: flex; align-items: center; justify-content: space-between; text-align: left; }
+.settings-group-title { font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .6px; color: #8da49c; }
+.settings-status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-left: auto; flex: none; transition: background 0.2s ease, box-shadow 0.2s ease; }
+.settings-status-dot.dot-active { background: #52ba93; box-shadow: 0 0 5px rgba(82, 186, 147, 0.45); }
+.settings-status-dot.dot-inactive { background: #475569; }
+.settings-status-dot.dot-error { background: #ef7766; box-shadow: 0 0 5px rgba(239, 119, 102, 0.45); }
+.settings-group { background: rgba(10,19,23,.65); border: 1px solid rgba(255,255,255,.07); border-radius: 10px; overflow: hidden; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 14px; gap: 12px; min-height: 38px; border-bottom: 1px solid rgba(255,255,255,.045); transition: background .15s; }
 .settings-row:last-child { border-bottom: none; }
 .settings-row.switch-field { cursor: pointer; }
 .settings-row:hover { background: rgba(255,255,255,.02); }
-.settings-label { font-size: 12.5px; font-weight: 500; color: #edf5f7; }
-.settings-badge { background: rgba(45,212,191,.12); color: #5eead4; border: 1px solid rgba(94,234,212,.28); padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: .2px; white-space: nowrap; }
-.settings-select { background: rgba(18,32,38,.85); color: #eaf3f5; border: 1px solid rgba(94,234,212,.25); border-radius: 7px; padding: 5px 9px; font-size: 11.5px; font-weight: 500; min-width: 105px; cursor: pointer; }
-.settings-row .compact-btn { min-height: 28px; padding: 4px 11px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.settings-inline-status { font-size: 11px; color: #5eead4; padding: 4px 14px 8px; margin: 0; line-height: 1.4; }
-.settings-subgroup { padding: 10px 14px 12px; background: rgba(0,0,0,.22); border-top: 1px solid rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 8px; transition: padding 0.18s ease, gap 0.18s ease; }
+.settings-label { font-size: 12px; font-weight: 500; color: #edf5f7; }
+.settings-badge { background: rgba(255,255,255,.06); color: #c0d3d8; border: 1px solid rgba(255,255,255,.1); padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.settings-select { background: rgba(255,255,255,.04); color: #edf5f7; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 4px 8px; font-size: 11.5px; font-weight: 500; width: 110px; height: 28px; min-height: 28px; cursor: pointer; box-sizing: border-box; outline: none; transition: background .15s, border-color .15s; }
+.settings-select:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.2); }
+.settings-select:focus { border-color: rgba(255,255,255,.32); }
+.settings-row .compact-btn { width: 110px; min-height: 28px; height: 28px; padding: 0 10px; font-size: 11.5px; font-weight: 550; color: #edf5f7; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; cursor: pointer; white-space: nowrap; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s, color .15s; }
+.settings-row .compact-btn:hover:not(:disabled) { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); color: #ffffff; }
+.settings-inline-status { font-size: 11px; color: #8da49c; padding: 4px 14px 8px; margin: 0; line-height: 1.4; }
+.settings-subgroup { padding: 9px 14px 11px; background: rgba(0,0,0,.22); border-top: 1px solid rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 8px; transition: padding 0.18s ease, gap 0.18s ease; }
 #telegram-config-panel.is-configured { padding: 7px 14px 9px; gap: 6px; background: rgba(0,0,0,.16); }
 #telegram-config-panel.is-configured .telegram-inputs-grid { gap: 10px; }
 #telegram-config-panel.is-configured .settings-input-text { padding: 5px 9px; font-size: 11px; }
 #telegram-config-panel.is-configured .telegram-panel-footer { min-height: 26px; }
-.telegram-guide-box { background: rgba(94,234,212,.04); border: 1px solid rgba(94,234,212,.16); border-radius: 9px; padding: 8px 11px; margin-bottom: 2px; }
-.telegram-guide-header { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #5eead4; margin-bottom: 5px; }
-.telegram-guide-header strong { font-weight: 600; letter-spacing: .2px; }
+.telegram-guide-box { background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 8px 11px; margin-bottom: 2px; }
+.telegram-guide-header { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #8da49c; margin-bottom: 5px; }
+.telegram-guide-header strong { font-weight: 600; letter-spacing: .2px; color: #d1dcde; }
 .telegram-guide-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.telegram-guide-steps li { display: flex; align-items: flex-start; gap: 7px; font-size: 10.5px; line-height: 1.4; color: #c0d3d8; }
-.telegram-guide-steps .guide-num { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: rgba(94,234,212,.18); color: #5eead4; font-size: 9.5px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
-.telegram-guide-steps code { background: rgba(0,0,0,.4); border: 1px solid rgba(94,234,212,.22); padding: 1px 4px; border-radius: 4px; font-size: 10px; color: #5eead4; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; }
-.telegram-guide-steps .guide-link { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+.telegram-guide-steps li { display: flex; align-items: flex-start; gap: 7px; font-size: 10.5px; line-height: 1.4; color: #a4b8bf; }
+.telegram-guide-steps .guide-num { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: rgba(255,255,255,.08); color: #cbd5e1; font-size: 9.5px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.telegram-guide-steps code { background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.1); padding: 1px 4px; border-radius: 4px; font-size: 10px; color: #e2eeea; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; }
+.telegram-guide-steps .guide-link { color: #8da49c; text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
 .telegram-guide-steps .guide-link:hover { color: #ffffff; }
 .telegram-guide-steps b, .telegram-guide-steps strong { color: #edf5f7; font-weight: 600; }
 .telegram-inputs-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -272,24 +279,26 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 }
 .telegram-panel-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 2px; min-height: 30px; }
 .telegram-footer-left { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
-.telegram-guide-toggle-btn { background: none; border: none; padding: 0; font-size: 10.5px; font-weight: 500; color: #5eead4; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; white-space: nowrap; opacity: 0.75; transition: opacity 0.15s, color 0.15s; }
+.telegram-guide-toggle-btn { background: none; border: none; padding: 0; font-size: 10.5px; font-weight: 500; color: #8da49c; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; white-space: nowrap; opacity: 0.85; transition: opacity 0.15s, color 0.15s; }
 .telegram-guide-toggle-btn:hover { opacity: 1; color: #ffffff; }
 .telegram-panel-footer .settings-inline-status { padding: 0; margin: 0; }
 .settings-input-row { display: flex; flex-direction: column; gap: 3px; }
-.settings-input-label { font-size: 10.5px; font-weight: 600; color: #8fa7b0; text-transform: uppercase; letter-spacing: .5px; }
-.settings-input-text { background: rgba(18,32,38,.85); color: #eaf3f5; border: 1px solid rgba(94,234,212,.22); border-radius: 7px; padding: 6px 9px; font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; outline: none; transition: border-color .15s, box-shadow .15s; }
-.settings-input-text:focus { border-color: #5eead4; box-shadow: 0 0 0 2px rgba(94,234,212,.15); }
+.settings-input-label { font-size: 10px; font-weight: 600; color: #7d939c; text-transform: uppercase; letter-spacing: .5px; }
+.settings-input-text { background: rgba(0,0,0,.3); color: #eaf3f5; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; padding: 5px 9px; font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; outline: none; transition: border-color .15s, box-shadow .15s; }
+.settings-input-text:focus { border-color: rgba(255,255,255,.28); box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
 .settings-input-text.input-invalid { border-color: #ef7766 !important; background: rgba(239, 119, 102, 0.08) !important; }
-.settings-input-text.input-invalid:focus { border-color: #ef7766 !important; box-shadow: 0 0 0 2px rgba(239, 119, 102, 0.2) !important; }
+.settings-input-text.input-invalid:focus { border-color: #ef7766 !important; box-shadow: 0 0 0 1px rgba(239, 119, 102, 0.3) !important; }
 .settings-input-actions { display: flex; gap: 8px; }
 .settings-input-actions .settings-input-text { flex: 1; min-width: 0; }
+#telegram-detect-btn, #telegram-test-btn { min-height: 28px; height: 28px; padding: 0 12px; font-size: 11.5px; font-weight: 550; color: #edf5f7; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; cursor: pointer; white-space: nowrap; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s, color .15s; }
+#telegram-detect-btn:hover:not(:disabled), #telegram-test-btn:hover:not(:disabled) { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); color: #ffffff; }
 .settings-row-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
-.settings-footer-card { margin-top: 12px; padding: 10px 14px; background: rgba(12,23,28,.7); border: 1px solid rgba(94,234,212,.15); border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.settings-footer-card { margin-top: 12px; padding: 9px 14px; background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.06); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .settings-brand-info { display: flex; flex-direction: column; gap: 2px; }
-.settings-app-name { font-size: 13px; font-weight: 700; color: #ffffff; letter-spacing: .3px; }
-.settings-brand-sub { font-size: 10.5px; color: #72919c; }
-.coffee-support-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.32); color: #fcd34d; font-size: 12px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: background .18s, border-color .18s, transform .15s; white-space: nowrap; }
-.coffee-support-btn:hover { background: rgba(245,158,11,.22); border-color: rgba(245,158,11,.55); color: #ffffff; transform: translateY(-1px); }
+.settings-app-name { font-size: 12.5px; font-weight: 650; color: #ffffff; letter-spacing: .2px; }
+.settings-brand-sub { font-size: 10px; color: #72919c; }
+.coffee-support-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; min-height: 28px; height: 28px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #cbd5e1; font-size: 11.5px; font-weight: 550; border-radius: 6px; text-decoration: none; transition: background .15s, border-color .15s, color .15s; white-space: nowrap; }
+.coffee-support-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); color: #ffffff; }
 .copy-confirmation h2 { font-size: 24px; font-weight: 600; }
 .copy-confirmation-direction { color: var(--section-light); background: rgba(var(--section-rgb),.07); }
 .copy-confirmation::backdrop { backdrop-filter: blur(var(--glass-blur)); }

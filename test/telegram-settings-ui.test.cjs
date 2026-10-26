@@ -75,7 +75,7 @@ test('updateTelegramTutorialVisibility hides tutorial when valid and reveals whe
   const telegramConfigPanel = createMockElement();
   const telegramBotTokenInput = createMockElement();
   const telegramToggleGuideBtn = createMockElement();
-  const telegramStatusBadge = createMockElement();
+  const telegramStatusDot = createMockElement();
   const telegramEnabledToggle = { checked: true };
 
   const sandbox = {
@@ -83,7 +83,7 @@ test('updateTelegramTutorialVisibility hides tutorial when valid and reveals whe
     telegramConfigPanel,
     telegramBotTokenInput,
     telegramToggleGuideBtn,
-    telegramStatusBadge,
+    telegramStatusDot,
     telegramEnabledToggle,
     isTokenApiInvalid: false,
     userToggledGuide: false
@@ -95,27 +95,29 @@ test('updateTelegramTutorialVisibility hides tutorial when valid and reveals whe
   `;
   vm.runInNewContext(script, sandbox);
 
-  // Case 1: Token is empty -> tutorial is visible, panel is not is-configured
+  // Case 1: Token is empty -> tutorial is visible, panel is not is-configured, dot is inactive
   sandbox.telegramBotTokenInput.value = '';
   sandbox.updateTelegramTutorialVisibility();
   assert.equal(sandbox.telegramGuideBox.style.display, 'block');
   assert.equal(sandbox.telegramConfigPanel.classList.contains('is-configured'), false);
+  assert.equal(sandbox.telegramStatusDot.classList.contains('dot-inactive'), true);
 
-  // Case 2: Token is invalid format -> tutorial is visible, input marked invalid
+  // Case 2: Token is invalid format -> tutorial is visible, input marked invalid, dot is error
   sandbox.telegramBotTokenInput.value = 'invalid_token_123';
   sandbox.updateTelegramTutorialVisibility();
   assert.equal(sandbox.telegramGuideBox.style.display, 'block');
   assert.equal(sandbox.telegramConfigPanel.classList.contains('is-configured'), false);
   assert.equal(sandbox.telegramBotTokenInput.classList.contains('input-invalid'), true);
+  assert.equal(sandbox.telegramStatusDot.classList.contains('dot-error'), true);
 
-  // Case 3: Token is valid format -> tutorial is hidden, panel is configured & reduced
+  // Case 3: Token is valid format -> tutorial is hidden, panel is configured & reduced, dot is active
   sandbox.telegramBotTokenInput.value = '123456789:ABCdefGhIJKLMNOPQRSTUVWXYZabcdefghi';
   sandbox.updateTelegramTutorialVisibility();
   assert.equal(sandbox.telegramGuideBox.style.display, 'none');
   assert.equal(sandbox.telegramConfigPanel.classList.contains('is-configured'), true);
   assert.equal(sandbox.telegramBotTokenInput.classList.contains('input-invalid'), false);
   assert.equal(sandbox.telegramToggleGuideBtn.style.display, 'inline-block');
-  assert.equal(sandbox.telegramStatusBadge.style.display, 'inline-block');
+  assert.equal(sandbox.telegramStatusDot.classList.contains('dot-active'), true);
 
   // Case 4: Token was valid, but Telegram API rejected it (isTokenApiInvalid = true)
   sandbox.isTokenApiInvalid = true;
@@ -123,11 +125,13 @@ test('updateTelegramTutorialVisibility hides tutorial when valid and reveals whe
   assert.equal(sandbox.telegramGuideBox.style.display, 'block');
   assert.equal(sandbox.telegramConfigPanel.classList.contains('is-configured'), false);
   assert.equal(sandbox.telegramBotTokenInput.classList.contains('input-invalid'), true);
+  assert.equal(sandbox.telegramStatusDot.classList.contains('dot-error'), true);
 
-  // Case 5: Token becomes empty again -> tutorial reappears
+  // Case 5: Token becomes empty again -> tutorial reappears, dot is inactive
   sandbox.isTokenApiInvalid = false;
   sandbox.telegramBotTokenInput.value = '';
   sandbox.updateTelegramTutorialVisibility();
   assert.equal(sandbox.telegramGuideBox.style.display, 'block');
   assert.equal(sandbox.telegramConfigPanel.classList.contains('is-configured'), false);
+  assert.equal(sandbox.telegramStatusDot.classList.contains('dot-inactive'), true);
 });

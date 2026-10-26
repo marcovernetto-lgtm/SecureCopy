@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { VolumeMonitor, eligibleVolume } = require('../volume-monitor');
-const { createLoginStartup, launchAgentPlist } = require('../login-startup');
+const { VolumeMonitor, eligibleVolume } = require('../src/volume-monitor');
+const { createLoginStartup, launchAgentPlist } = require('../src/login-startup');
 
 test('volume monitor ignores existing mounts and announces a new card only once', async () => {
   let mounts = [{ root: '/Volumes/existing', signature: '1:1' }]; const arrivals = [];

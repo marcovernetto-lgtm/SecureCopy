@@ -1,4 +1,4 @@
-const test=require('node:test');const assert=require('node:assert/strict');const path=require('node:path');const {pathSelection}=require('../path-selection');
+const test=require('node:test');const assert=require('node:assert/strict');const path=require('node:path');const {pathSelection}=require('../src/path-selection');
 test('selection matches the former prefix rules, including directory ancestors and similar names',()=>{
  const choices=['CARD/day','CARD/other/clip.RAW','CARD/empty','CARD/day'];const selection=pathSelection(choices);
  for(const value of ['CARD','CARD/day','CARD/day/clip.MOV','CARD/day2/clip.MOV','CARD/other','CARD/other/clip.RAW','CARD/other/clip.RAWx','CARD/empty','OTHER/day','absent']){

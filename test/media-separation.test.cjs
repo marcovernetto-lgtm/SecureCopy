@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs/promises');
-const { runCopy, categorizeMediaFile } = require('../copy-engine');
+const { runCopy, categorizeMediaFile } = require('../src/copy-engine');
 
 test('categorizeMediaFile properly identifies Video, Foto RAW, and Foto JPEG', () => {
   assert.equal(categorizeMediaFile('clip.mov'), 'Video');

@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { runCopy, copyFileVerified, sha256 } = require('../copy-engine');
-const { compareFolders, reconcileFolders, expandComparisonDecisions } = require('../compare-engine');
+const { runCopy, copyFileVerified, sha256 } = require('../src/copy-engine');
+const { compareFolders, reconcileFolders, expandComparisonDecisions } = require('../src/compare-engine');
 
 async function fixture(t) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'securecopy-audit-fix-')));

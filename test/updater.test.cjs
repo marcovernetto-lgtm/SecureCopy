@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { compareVersions, getDownloadUrlForArch, createUpdater } = require('../updater');
+const { compareVersions, getDownloadUrlForArch, createUpdater } = require('../src/updater');
 
 test('compareVersions accurately compares semantic version strings', () => {
   assert.equal(compareVersions('2.7.8', '2.7.7'), 1);

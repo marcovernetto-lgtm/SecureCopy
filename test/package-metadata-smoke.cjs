@@ -3,8 +3,8 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
-const { setCreationTime } = require('../mac-metadata');
-const { sha256 } = require('../copy-engine');
+const { setCreationTime } = require('../src/mac-metadata');
+const { sha256 } = require('../src/copy-engine');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 (async () => {

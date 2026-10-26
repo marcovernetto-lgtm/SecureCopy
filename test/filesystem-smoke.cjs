@@ -3,9 +3,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
-const { runCopy, sha256, readResourceFork } = require('../copy-engine');
-const { setCreationTime } = require('../mac-metadata');
-const { compareFolders, reconcileFolders } = require('../compare-engine');
+const { runCopy, sha256, readResourceFork } = require('../src/copy-engine');
+const { setCreationTime } = require('../src/mac-metadata');
+const { compareFolders, reconcileFolders } = require('../src/compare-engine');
 
 (async () => {
   const caseRoot = path.join((await fs.readFile('/tmp/securecopy-case-audit-location.txt', 'utf8')).trim(), 'mount');

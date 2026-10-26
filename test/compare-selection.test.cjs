@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const rendererCode = fs.readFileSync(require.resolve('../renderer.js'), 'utf8');
+const rendererCode = fs.readFileSync(require.resolve('../src/renderer.js'), 'utf8');
 
 function createDOMFixture() {
     const elements = new Map();
@@ -186,7 +186,7 @@ test('compareFolders identifies files present in different subfolder locations a
     const os = require('node:os');
     const path = require('node:path');
     const fsp = require('node:fs/promises');
-    const { compareFolders } = require('../compare-engine');
+    const { compareFolders } = require('../src/compare-engine');
 
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'securecopy-relocated-test-'));
     try {

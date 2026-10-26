@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const rendererCode = fs.readFileSync(require.resolve('../renderer.js'), 'utf8');
+const rendererCode = fs.readFileSync(require.resolve('../src/renderer.js'), 'utf8');
 
 function extractTelegramLogic() {
   const isTelegramBotTokenValidMatch = rendererCode.match(/function isTelegramBotTokenValid\([\s\S]*?\n\}/);

@@ -2,7 +2,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
-const { runCopy, sha256 } = require('../copy-engine');
+const { runCopy, sha256 } = require('../src/copy-engine');
 (async () => {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'securecopy-large-audit-')));
   try {

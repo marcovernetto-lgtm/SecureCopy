@@ -3,7 +3,7 @@ const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
 const { performance, monitorEventLoopDelay } = require('node:perf_hooks');
-const { compareFolders, forRenderer } = require('../compare-engine');
+const { compareFolders, forRenderer } = require('../src/compare-engine');
 (async () => {
   const count = Number(process.env.STRESS_FILES || 200000);
   assert.ok(Number.isSafeInteger(count) && count >= 1000 && count <= 1000000);

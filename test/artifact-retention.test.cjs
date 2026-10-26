@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const { RETENTION_DAYS, cleanupArtifacts, saveActivityLog } = require('../artifact-retention');
+const { RETENTION_DAYS, cleanupArtifacts, saveActivityLog } = require('../src/artifact-retention');
 const DAY = 86400000;
 
 async function setup(t) {

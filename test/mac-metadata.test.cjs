@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { setCreationTime } = require('../mac-metadata');
-const { runCopy, copyFileVerified, sha256 } = require('../copy-engine');
-const { compareFolders, reconcileFolders } = require('../compare-engine');
+const { setCreationTime } = require('../src/mac-metadata');
+const { runCopy, copyFileVerified, sha256 } = require('../src/copy-engine');
+const { compareFolders, reconcileFolders } = require('../src/compare-engine');
 const options = { skip: process.platform !== 'darwin' };
 
 async function fixture(t) {

@@ -4,7 +4,7 @@ const os = require('node:os');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { performance } = require('node:perf_hooks');
-const { runCopy, sha256 } = require('../copy-engine');
+const { runCopy, sha256 } = require('../src/copy-engine');
 (async()=>{
  const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'securecopy-stress-copy-')));
  const source=path.join(root,'CARD'),destination=path.join(root,'backup'); await fs.mkdir(source);

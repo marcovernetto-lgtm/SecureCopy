@@ -6,9 +6,9 @@ const os = require('node:os');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const exec = promisify(execFile);
-const { runCopy, copyFileVerified, sha256 } = require('../copy-engine');
-const { setCreationTime } = require('../mac-metadata');
-const { readMacMetadata } = require('../file-metadata');
+const { runCopy, copyFileVerified, sha256 } = require('../src/copy-engine');
+const { setCreationTime } = require('../src/mac-metadata');
+const { readMacMetadata } = require('../src/file-metadata');
 const options = { skip: process.platform !== 'darwin' };
 
 async function fixture(t, count = 1) {

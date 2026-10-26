@@ -5,7 +5,7 @@ const sync = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
-const { runCopy, sha256 } = require('../copy-engine');
+const { runCopy, sha256 } = require('../src/copy-engine');
 
 async function fixture(t) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'securecopy-media-')));
@@ -85,7 +85,7 @@ test('retry repairs only creation date when contents are already intact', { skip
   const file = path.join(source, 'photo.CR3'); await fs.writeFile(file, 'intact camera data');
   await runCopy({ sourceDirs: [source], destDir });
   const destination = path.join(target, 'photo.CR3');
-  const { setCreationTime } = require('../mac-metadata');
+  const { setCreationTime } = require('../src/mac-metadata');
   const expected = await fs.stat(file);
   await setCreationTime(destination, expected.birthtimeMs - 120000);
   const before = await fs.stat(destination);
@@ -105,7 +105,7 @@ for (const command of ['/usr/bin/ditto', '/usr/bin/xattr']) {
         if (file === ${JSON.stringify(command)}) { const callback = args.at(-1); queueMicrotask(() => callback(Object.assign(new Error('Unsupported filesystem metadata'), {code:'ENOTSUP'}))); return {}; }
         return original.call(this, file, ...args);
       };
-      require(${JSON.stringify(path.resolve(__dirname, '../copy-engine'))}).runCopy({sourceDirs:[${JSON.stringify(source)}],destDir:${JSON.stringify(destDir)}}).then(report=>console.log(JSON.stringify(report))).catch(error=>{console.error(error);process.exitCode=1;});`;
+      require(${JSON.stringify(path.resolve(__dirname, '../src/copy-engine'))}).runCopy({sourceDirs:[${JSON.stringify(source)}],destDir:${JSON.stringify(destDir)}}).then(report=>console.log(JSON.stringify(report))).catch(error=>{console.error(error);process.exitCode=1;});`;
     const report = JSON.parse(execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' }));
     assert.equal(report.status, 'completed'); assert.equal(report.copied, 1); assert.deepEqual(report.failures, []); assert.ok(report.warnings.length);
     const target = path.join(destDir, 'CARD/camera.unknown');

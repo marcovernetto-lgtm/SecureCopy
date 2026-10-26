@@ -1,4 +1,4 @@
-const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');const assert=require('node:assert/strict');const crypto=require('node:crypto');const {performance}=require('node:perf_hooks');const {runCopy,sha256}=require('../copy-engine');
+const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');const assert=require('node:assert/strict');const crypto=require('node:crypto');const {performance}=require('node:perf_hooks');const {runCopy,sha256}=require('../src/copy-engine');
 (async()=>{
  const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'securecopy-stress-large-')));let sample;
  try{

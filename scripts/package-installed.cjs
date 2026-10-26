@@ -29,9 +29,7 @@ const entitlement = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLI
   const staging = await fs.mkdtemp(path.join(os.tmpdir(), 'securecopy-package-'));
   try {
     const source = path.join(staging, 'source'); await fs.mkdir(source);
-    for (const file of await fs.readdir(root)) {
-      if (/\.(?:js|css|html)$/.test(file) || file === 'Assets') await fs.cp(path.join(root, file), path.join(source, file), { recursive: true });
-    }
+    await fs.cp(path.join(root, 'src'), path.join(source, 'src'), { recursive: true });
     const { devDependencies, scripts, ...appMetadata } = metadata;
     await fs.writeFile(path.join(source, 'package.json'), JSON.stringify(appMetadata, null, 2));
     run('/usr/bin/ditto', [base, target]);
@@ -39,7 +37,7 @@ const entitlement = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLI
     await fs.rm(archive);
     await createPackage(source, archive);
     for (const file of ['copy-engine.js', 'mac-metadata.js', 'renderer.js', 'i18n.js', 'index.html']) {
-      if (!extractFile(archive, file).equals(await fs.readFile(path.join(source, file)))) throw new Error(`Archivio diverso dai sorgenti: ${file}`);
+      if (!extractFile(archive, path.join('src', file)).equals(await fs.readFile(path.join(source, 'src', file)))) throw new Error(`Archivio diverso dai sorgenti: ${file}`);
     }
     const hash = crypto.createHash('sha256').update(getRawHeader(archive).headerString).digest('hex');
     const info = path.join(target, 'Contents', 'Info.plist');

@@ -11,7 +11,7 @@ const {
   generateDITReportHTML,
   getReportSuffix,
   resolveUniqueReportPdfPath
-} = require('../dit-report');
+} = require('../src/dit-report');
 
 test('formatBytes handles small, large, and zero byte values accurately', () => {
   assert.equal(formatBytes(0), '0 B');

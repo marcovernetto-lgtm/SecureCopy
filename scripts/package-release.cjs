@@ -16,8 +16,9 @@ const run = (command, args) => execFileSync(command, args, { stdio: 'inherit' })
   if (executable.readUInt32LE(0) !== 0xfeedfacf || executable.readUInt32LE(4) !== (arch === 'x64' ? 0x01000007 : 0x0100000c)) throw new Error('Architettura del pacchetto diversa da quella richiesta.');
   const archive = path.join(app, 'Contents/Resources/app.asar');
   if (JSON.parse(extractFile(archive, 'package.json')).version !== metadata.version) throw new Error('Ricompila prima la versione corrente.');
-  for (const file of (await fs.readdir(root)).filter(name => /\.(js|css|html)$/.test(name))) {
-    if (!extractFile(archive, file).equals(await fs.readFile(path.join(root, file)))) throw new Error(`Pacchetto non aggiornato: ${file}`);
+  const srcDir = path.join(root, 'src');
+  for (const file of (await fs.readdir(srcDir)).filter(name => /\.(js|css|html)$/.test(name))) {
+    if (!extractFile(archive, path.join('src', file)).equals(await fs.readFile(path.join(srcDir, file)))) throw new Error(`Pacchetto non aggiornato: ${file}`);
   }
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'securecopy-release-'));

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const renderer = fs.readFileSync(require.resolve('../renderer.js'), 'utf8');
+const renderer = fs.readFileSync(require.resolve('../src/renderer.js'), 'utf8');
 function fixture() {
   const elements = new Map();
   function element(name) {

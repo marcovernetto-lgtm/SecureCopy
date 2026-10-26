@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { runCopy, sha256 } = require('../copy-engine');
-const { setCreationTime } = require('../mac-metadata');
+const { runCopy, sha256 } = require('../src/copy-engine');
+const { setCreationTime } = require('../src/mac-metadata');
 
 async function makeFixture(t) {
   const base = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'securecopy-single-file-test-')));

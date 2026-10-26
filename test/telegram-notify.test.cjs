@@ -8,7 +8,7 @@ const {
   detectTelegramChatId,
   sendTestNotification,
   formatCopyCompletionMessage
-} = require('../telegram-notify.js');
+} = require('../src/telegram-notify.js');
 
 test('escapeHtml properly sanitizes text for Telegram HTML', () => {
   assert.equal(escapeHtml('DCIM & Photos <A>'), 'DCIM &amp; Photos &lt;A&gt;');

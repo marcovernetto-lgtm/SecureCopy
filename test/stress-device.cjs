@@ -1,4 +1,4 @@
-const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');const assert=require('node:assert/strict');const {execFileSync}=require('node:child_process');const {runCopy,sha256}=require('../copy-engine');
+const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');const assert=require('node:assert/strict');const {execFileSync}=require('node:child_process');const {runCopy,sha256}=require('../src/copy-engine');
 (async()=>{
  const base=(await fs.readFile('/tmp/securecopy-stress-device-location.txt','utf8')).trim();assert.ok(path.basename(base).startsWith('securecopy-stress-device-'));const mount=path.join(base,'mount');
  const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'securecopy-stress-device-fixture-')));const source=path.join(root,'CARD');await fs.mkdir(source);await fs.writeFile(path.join(source,'clip.BRAW'),Buffer.alloc(8*2**20,17));

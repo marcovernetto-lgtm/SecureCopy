@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+    onFolderFlowCopyRequested: callback => ipcRenderer.on('folderflow-copy-requested', (_event, request) => callback(request)),
     // Folder selection
     selectFolder: () => ipcRenderer.invoke('dialog:openDirectory'),
     selectMultipleFolders: () => ipcRenderer.invoke('dialog:openMultipleDirectories'),

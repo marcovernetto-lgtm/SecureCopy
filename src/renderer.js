@@ -104,7 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStartButtonState();
     renderCompareSelections();
     updateCompareActions();
-    showHomeScreen();
+    const destination = new URLSearchParams(window.location.search).get('folderflowDestination');
+    if (destination) prepareFolderFlowCopy({ destination });
+    else showHomeScreen();
 });
 
 // Error Handling
@@ -2707,3 +2709,15 @@ checkUpdatesBtn?.addEventListener('click', async () => {
         checkUpdatesBtn.disabled = false;
     }
 });
+
+
+// Prepare only the next copy; active jobs and the queue keep their own paths.
+function prepareFolderFlowCopy(request) {
+    if (!request || typeof request.destination !== 'string' || !request.destination) return;
+    if (creditsBox.style.display !== 'none') closeSettings();
+    clearSelection();
+    addDestination(request.destination);
+    showSetupScreen();
+    sourceBtn.focus({ preventScroll: true });
+}
+window.electronAPI?.onFolderFlowCopyRequested?.(prepareFolderFlowCopy);

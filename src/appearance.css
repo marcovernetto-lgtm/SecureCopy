@@ -1070,23 +1070,7 @@ input[type='checkbox'] { accent-color: var(--section-light); }
   transform: scale(0.94);
 }
 
-/* Microcopy rassicurazione e pre-flight check spazio disco */
-.source-safety-note {
-  display: flex;
-  align-items: center;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  line-height: 1.35;
-}
-.source-safety-note svg {
-  color: #38bdf8;
-}
-
+/* Pre-flight check spazio disco */
 .copy-calm-note {
   display: flex;
   align-items: center;

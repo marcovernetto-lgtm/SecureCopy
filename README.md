@@ -154,3 +154,7 @@ Significa che un file presente nella prima cartella esiste anche nella seconda, 
 ---
 
 *Realizzato con cura da **unshapedstudio** per tutti coloro che amano i propri file.*
+
+### Avvio da FolderFlow
+
+FolderFlow può avviare SecureCopy con `--from-folderflow --destination "/percorso/progetto"`: viene mostrata direttamente Copia sicura, con la destinazione selezionata e nessuna sorgente precedente. È richiesta una cartella esistente, leggibile e scrivibile. La copia parte soltanto su comando dell’utente. Gli stessi argomenti vengono gestiti anche quando SecureCopy è già aperta, lasciando intatte le operazioni in corso e in coda. Senza il flag dedicato, l’avvio normale rimane sulla pagina iniziale.

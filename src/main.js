@@ -3,6 +3,8 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const fs = require('fs');
 const crypto = require('crypto');
+const { folderFlowDestination } = require('./folderflow-launch');
+let pendingFolderFlowDestination = folderFlowDestination(process.argv);
 const { runCopy, resolveExistingVolumePath } = require('./copy-engine');
 const { RETENTION_DAYS, managedDirectory, cleanupArtifacts, saveActivityLog } = require('./artifact-retention');
 const { overlap, snapshot, matches } = require('./fs-safety');
@@ -23,9 +25,21 @@ let updaterInterval = null;
 let quitting = false;
 const profileDirectory = app.commandLine?.getSwitchValue('user-data-dir');
 if (profileDirectory) app.setPath('userData', path.resolve(profileDirectory));
-const primaryInstance = !app.requestSingleInstanceLock || app.requestSingleInstanceLock();
+const primaryInstance = !app.requestSingleInstanceLock || app.requestSingleInstanceLock({ folderFlowDestination: pendingFolderFlowDestination });
 if (!primaryInstance) app.quit();
-app.on('second-instance', () => app.whenReady().then(openMainWindow));
+app.on('second-instance', (_event, args, _directory, data) => {
+  const destination = folderFlowDestination(['--from-folderflow', '--destination', data?.folderFlowDestination]) || folderFlowDestination(args);
+  if (destination) pendingFolderFlowDestination = destination;
+  app.whenReady().then(() => {
+    openMainWindow();
+    deliverFolderFlowDestination();
+  });
+});
+function deliverFolderFlowDestination() {
+  if (!pendingFolderFlowDestination || !mainWindow || mainWindow.webContents.isLoading()) return;
+  send('folderflow-copy-requested', { destination: pendingFolderFlowDestination });
+  pendingFolderFlowDestination = null;
+}
 let copyQueue = [];
 let pendingCopyRecovery = [];
 const activeJobs = new Map();
@@ -247,8 +261,13 @@ function createWindow(background = false) {
       openApprovedExternal(url);
     }
   });
-  mainWindow.loadFile(localPage);
-  mainWindow.webContents.on('did-finish-load', updateQueue);
+  const destination = pendingFolderFlowDestination;
+  pendingFolderFlowDestination = null;
+  mainWindow.loadFile(localPage, destination ? { query: { folderflowDestination: destination } } : {});
+  mainWindow.webContents.on('did-finish-load', () => {
+    updateQueue();
+    deliverFolderFlowDestination();
+  });
   mainWindow.once('ready-to-show', () => { if (!background) mainWindow?.show(); });
   mainWindow.on('close', event => {
     if (process.platform === 'darwin' && !quitting) { event.preventDefault(); mainWindow.hide(); app.dock?.hide(); }
@@ -290,7 +309,7 @@ app.whenReady().then(async () => {
     onError: error => { openMainWindow(); send('app-error', { message: error.message }); }
   });
   const startup = backgroundService.getSettings();
-  const background = process.argv.includes('--background') || !!startup.openedAtLogin;
+  const background = !pendingFolderFlowDestination && (process.argv.includes('--background') || !!startup.openedAtLogin);
   createWindow(background);
   if (background) app.dock?.hide();
   backgroundService.start().catch(error => console.error('Avvio monitor dischi:', error.message));

@@ -152,6 +152,8 @@ test('new source material appearing mid-copy is listed for targeted retry', asyn
 test('corrupt temporary data is never reported copied or published as valid', async t => {
   const { source, destDir, target } = await fixture(t);
   await fs.writeFile(path.join(source, 'clip.MP4'), 'original data');
+  // Injects through fs.open, which only the in-process fallback hash uses.
+  const helper = process.env.SECURECOPY_HASH_HELPER; process.env.SECURECOPY_HASH_HELPER = '';
   const open = fs.open; let injected = false;
   fs.open = async (file, flags, ...args) => {
     if (String(file).endsWith('.part') && typeof flags === 'number' && !injected) { injected = true; await fs.writeFile(file, 'corrupt!'); }
@@ -161,5 +163,8 @@ test('corrupt temporary data is never reported copied or published as valid', as
     const result = await runCopy({ sourceDirs: [source], destDir });
     assert.ok(injected); assert.equal(result.status, 'partial'); assert.equal(result.copied, 0); assert.equal(result.verifiedFiles.length, 0);
     await assert.rejects(fs.stat(path.join(target, 'clip.MP4')), { code: 'ENOENT' });
-  } finally { fs.open = open; }
+  } finally {
+    fs.open = open;
+    if (helper === undefined) delete process.env.SECURECOPY_HASH_HELPER; else process.env.SECURECOPY_HASH_HELPER = helper;
+  }
 });

@@ -4,7 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { promisify } = require('util');
 const { execFile } = require('child_process');
-const { sha256, copyFileVerified, readResourceFork, sameResourceFork, requireCreationDate } = require('./copy-engine');
+const { sha256, verifyHash, copyFileVerified, readResourceFork, sameResourceFork, requireCreationDate } = require('./copy-engine');
 const { visibleEntries } = require('./visible-files');
 const { TIMESTAMP_TOLERANCE_MS, sameTimestamp, readMacMetadata } = require('./file-metadata');
 const { snapshot, matches, statOrNull, captureDirectory, assertDirectory, overlap } = require('./fs-safety');
@@ -555,7 +555,7 @@ async function reconcileFolders(session, decisions, { signal, onProgress, select
       const actual = await fsp.lstat(record.destination);
       if (!actual.isFile() || actual.isSymbolicLink() || actual.size !== source.stats.size || await fsp.realpath(path.dirname(record.destination)) !== path.dirname(record.destination)) throw new Error('Il file copiato è mancante, incompleto o sostituito.');
       if (!matches(expected, snapshot(actual))) {
-        if (await sha256(record.destination, signal) !== record.sha256 || !sameResourceFork(record.resourceFork, await readResourceFork(record.destination, signal)) || !matches(actual, await fsp.lstat(record.destination))) throw new Error('Il contenuto copiato è cambiato dopo la verifica.');
+        if ((await verifyHash(record.destination, signal)).hash !== record.sha256 || !sameResourceFork(record.resourceFork, await readResourceFork(record.destination, signal)) || !matches(actual, await fsp.lstat(record.destination))) throw new Error('Il contenuto copiato è cambiato dopo la verifica.');
       }
       await requireCreationDate(record.destination, source.stats, record.sha256, signal);
     } catch (failure) {

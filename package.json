@@ -10,6 +10,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.cjs",
+    "build:native": "node scripts/build-native.cjs",
     "build:mac": "node scripts/package-installed.cjs",
     "test:electron": "node test/package-metadata-smoke.cjs",
     "package:mac": "node scripts/package-release.cjs",

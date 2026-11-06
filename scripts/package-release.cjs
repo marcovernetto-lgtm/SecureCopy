@@ -20,6 +20,7 @@ const run = (command, args) => execFileSync(command, args, { stdio: 'inherit' })
   for (const file of (await fs.readdir(srcDir)).filter(name => /\.(js|css|html)$/.test(name))) {
     if (!extractFile(archive, path.join('src', file)).equals(await fs.readFile(path.join(srcDir, file)))) throw new Error(`Pacchetto non aggiornato: ${file}`);
   }
+  if (!(await fs.stat(path.join(app, 'Contents/MacOS/securecopy-hash')).catch(() => null))?.isFile()) throw new Error('Helper di verifica fisica mancante: ricompila il pacchetto.');
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'securecopy-release-'));
   try {

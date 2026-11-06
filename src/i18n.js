@@ -322,6 +322,8 @@
       return `Missing files — ${match[1]} missing, ${match[2]} to review.`;
     if ((match = value.match(/^Copia da verificare — (\d+) elementi con differenze\.$/)))
       return `Copy needs review — ${match[1]} different items.`;
+    if ((match = value.match(/^Verifica fisica non garantita per (\d+) file: .*$/)))
+      return `Physical verification not guaranteed for ${match[1]} files: the content was re-read, but the system may have served it from memory instead of the disk.`;
     if ((match = value.match(/^Metadati non conservati: (.*)\.$/)))
       return `Metadata not preserved: ${match[1].replaceAll('data di creazione', 'creation date').replaceAll('data di modifica', 'modification date').replaceAll('permessi', 'permissions')}.`;
     if ((match = value.match(/^Copia e verifica (\d+) di (\d+): (.*)$/)))

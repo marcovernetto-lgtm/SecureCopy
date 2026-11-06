@@ -8,6 +8,7 @@ const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const base = process.argv[2] || '/Applications/SecureCopy.app';
 const run = (command, args) => execFileSync(command, args, { stdio: 'inherit' });
+const { buildNative } = require('./build-native.cjs');
 const entitlement = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/><key>com.apple.security.cs.disable-library-validation</key><true/><key>com.apple.security.files.desktop.read-write</key><true/><key>com.apple.security.files.documents.read-write</key><true/><key>com.apple.security.files.downloads.read-write</key><true/><key>com.apple.security.files.user-selected.read-write</key><true/></dict></plist>`;
 
 (async () => {
@@ -54,9 +55,13 @@ const entitlement = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLI
       const helperInfo = path.join(target, 'Contents', 'Frameworks', `SecureCopy Helper${suffix}.app`, 'Contents', 'Info.plist');
       run('/usr/libexec/PlistBuddy', ['-c', `Set :CFBundleIdentifier com.unshapedstudio.securecopy.${helperSuffix}`, helperInfo]);
     }
+    // Cache-bypassing verification helper: outside the asar, next to the main executable.
+    buildNative(path.join(target, 'Contents', 'MacOS', 'securecopy-hash'));
     const entitlements = path.join(staging, 'entitlements.plist'); await fs.writeFile(entitlements, entitlement);
     run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', '--options', 'runtime', '--entitlements', entitlements, target]);
     run('/usr/bin/codesign', ['--verify', '--deep', '--strict', target]);
+    const helperCheck = execFileSync(path.join(target, 'Contents', 'MacOS', 'securecopy-hash'), [path.join(root, 'package.json')], { encoding: 'utf8' }).trim().split('\n').at(-1).split(' ');
+    if (helperCheck[1] !== crypto.createHash('sha256').update(await fs.readFile(path.join(root, 'package.json'))).digest('hex')) throw new Error('Helper di verifica fisica non funzionante.');
     console.log(`Build verificata ${metadata.version} ${arch}: ${target}`);
   } finally { await fs.rm(staging, { recursive: true, force: true }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

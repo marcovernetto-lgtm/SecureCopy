@@ -10,6 +10,7 @@ const { setCreationTime } = require('./mac-metadata');
 const { TIMESTAMP_TOLERANCE_MS, sameTimestamp, readMacMetadata, macMetadataDifferences } = require('./file-metadata');
 const { visibleEntries } = require('./visible-files');
 const { pathSelection } = require('./path-selection');
+const { physicalSha256 } = require('./physical-hash');
 
 const execFileAsync = promisify(execFile);
 
@@ -347,6 +348,16 @@ async function sha256(file, signal, onBytes) {
   }
 }
 
+// Destination checks must read the storage device, not bytes the system still
+// holds in memory from the write. Falls back to a cached read only when the
+// native helper is unavailable, and reports that the check was not physical.
+async function verifyHash(file, signal, onBytes) {
+  cancelled(signal);
+  const physical = await physicalSha256(file, signal, onBytes);
+  if (physical) return { hash: physical.hash, physical: physical.physical };
+  return { hash: await sha256(file, signal, onBytes), physical: false };
+}
+
 function metadataDifferences(source, dest) {
   const differences = [];
   if (!sameTimestamp(source.mtimeMs, dest.mtimeMs)) differences.push('data di modifica');
@@ -603,7 +614,8 @@ async function copyFileVerified(item, destination, { signal, onBytes, onPhase, o
 
   if (expectedTarget !== undefined && !matches(expectedTarget, snapshot(existing))) throw new Error('La destinazione è cambiata dopo l’analisi.');
   if (existing && existing.size === current.size) {
-    const existingHash = await sha256(destination, signal, bytes => onRead?.('destination', bytes, existing.size));
+    const existingCheck = await verifyHash(destination, signal, bytes => onRead?.('destination', bytes, existing.size));
+    const existingHash = existingCheck.hash;
     if (existingHash === sourceHash && sameResourceFork(sourceFork, await readResourceFork(destination, signal)) && (allowMetadataDifferences || sameMetadata(current, existing))) {
       const destinationMetadata = await optionalMacMetadata(destination, signal, allowMetadataDifferences, onMetadataWarning);
       const differences = [...metadataDifferences(current, existing), ...(sourceMetadata && destinationMetadata ? macMetadataDifferences(sourceMetadata, destinationMetadata) : [])];
@@ -616,8 +628,8 @@ async function copyFileVerified(item, destination, { signal, onBytes, onPhase, o
         if (!matches(current, await fsp.lstat(item.path))) throw new Error('La sorgente è cambiata durante la verifica.');
         if (!matches(existing, await fsp.lstat(destination))) throw new Error('La destinazione è cambiata durante la verifica.');
         try { await requireCreationDate(destination, current, sourceHash, signal); }
-        catch (error) { error.resourceFork = sourceFork; throw error; }
-        onVerified?.(sourceHash, sourceFork);
+        catch (error) { error.resourceFork = sourceFork; error.physicalVerification = existingCheck.physical; throw error; }
+        onVerified?.(sourceHash, sourceFork, existingCheck.physical);
         return 'skipped';
       }
     }
@@ -639,7 +651,11 @@ async function copyFileVerified(item, destination, { signal, onBytes, onPhase, o
     const tempStats = await fsp.stat(temp);
     if (tempStats.size !== current.size) throw new Error('Dimensione della copia diversa dalla sorgente.');
     onPhase?.('verify');
-    const copiedHash = await sha256(temp, signal, bytes => onRead?.('copy', bytes, current.size));
+    // The verified temporary becomes the destination through a hard link (same
+    // bytes on disk), so this physical read is the check of the published file.
+    const copiedCheck = await verifyHash(temp, signal, bytes => onRead?.('copy', bytes, current.size));
+    const copiedHash = copiedCheck.hash;
+    let physicalVerification = copiedCheck.physical;
     const sourceHashAfter = await sha256(item.path, signal, bytes => onRead?.('source-after', bytes, current.size));
     if (copiedHash !== sourceHash || sourceHashAfter !== sourceHash) {
       throw new Error('Checksum diverso o sorgente modificata durante la copia.');
@@ -695,7 +711,9 @@ async function copyFileVerified(item, destination, { signal, onBytes, onPhase, o
       await publishExclusive(temp, destination, { signal, stats: tempStats, useLinks, allowMetadataDifferences, onMetadataWarning, onOwned: stats => { owned = stats; } });
       if (owned.ino !== tempStats.ino || owned.dev !== tempStats.dev) {
         // Verify published contents even on filesystems without hard links.
-        if (await sha256(destination, signal) !== sourceHash || !sameResourceFork(sourceFork, await readResourceFork(destination, signal))) throw new Error('Verifica finale della destinazione fallita.');
+        const publishedCheck = await verifyHash(destination, signal);
+        physicalVerification = publishedCheck.physical;
+        if (publishedCheck.hash !== sourceHash || !sameResourceFork(sourceFork, await readResourceFork(destination, signal))) throw new Error('Verifica finale della destinazione fallita.');
         const finalStats = await fsp.stat(destination);
         const finalMetadata = await optionalMacMetadata(destination, signal, allowMetadataDifferences, onMetadataWarning);
         const finalDifferences = [...metadataDifferences(item.stats, finalStats), ...(sourceMetadata && finalMetadata ? macMetadataDifferences(sourceMetadata, finalMetadata) : [])].filter(difference => {
@@ -732,8 +750,8 @@ async function copyFileVerified(item, destination, { signal, onBytes, onPhase, o
     }
     onDestination?.(destination);
     try { await requireCreationDate(destination, current, sourceHash, signal); }
-    catch (error) { error.copyResult = 'copied'; error.previousVersion = backup; error.resourceFork = sourceFork; throw error; }
-    onVerified?.(sourceHash, sourceFork);
+    catch (error) { error.copyResult = 'copied'; error.previousVersion = backup; error.resourceFork = sourceFork; error.physicalVerification = physicalVerification; throw error; }
+    onVerified?.(sourceHash, sourceFork, physicalVerification);
     if (process.platform !== 'win32') {
       try {
         const directory = await fsp.open(path.dirname(destination), 'r');
@@ -821,6 +839,7 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
       let currentTransferred = 0;
       let verifiedHash = null;
       let verifiedFork = null;
+      let verifiedPhysical = false;
       let finalDestination = destination;
       let previousVersion = null;
       let fraction = 0;
@@ -852,13 +871,13 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
           fraction = Math.max(fraction, 0.15 + (item.stats.size ? Math.min(1, bytes / item.stats.size) : 1) * 0.65);
           emit('copy', { currentFileBytes: bytes, currentFileTotal: item.stats.size });
         },
-        onVerified: (hash, fork) => { verifiedHash = hash; verifiedFork = fork; }
+        onVerified: (hash, fork, physical) => { verifiedHash = hash; verifiedFork = fork; verifiedPhysical = physical === true; }
         });
         if (verifiedHash) { verifiedSnapshots.set(sourceKey, snapshot(await fsp.lstat(finalDestination))); await claimDestination(path.relative(destRoot, finalDestination)); }
         report[result]++;
         if (result === 'kept') report.failures.push({ path: item.path, reason: 'Saltato per scelta: il file di destinazione ha un contenuto diverso e non è stato sostituito.' });
         if (verifiedHash) report.verifiedFiles.push({ path: path.relative(destRoot, finalDestination), sourceRelative: sourceKey, sha256: verifiedHash, resourceFork: verifiedFork, bytes: item.stats.size,
-          createdAt: item.stats.birthtime.toISOString(), modifiedAt: item.stats.mtime.toISOString(), previousVersion, status: result });
+          createdAt: item.stats.birthtime.toISOString(), modifiedAt: item.stats.mtime.toISOString(), previousVersion, status: result, physicalVerification: verifiedPhysical });
         if (result === 'copied') report.transferredBytes += item.stats.size;
         onLog?.('SUCCESS', `${result === 'copied' ? 'Verificato' : result === 'kept' ? 'Saltato per scelta' : 'Già valido'}: ${relative}`);
       } catch (error) {
@@ -870,7 +889,7 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
           verifiedSnapshots.set(sourceKey, snapshot(await fsp.lstat(error.destination)));
           report.verifiedFiles.push({ path: path.relative(destRoot, error.destination), sourceRelative: sourceKey, sha256: error.sha256, resourceFork: error.resourceFork || null, bytes: item.stats.size,
             createdAt: item.stats.birthtime.toISOString(), modifiedAt: item.stats.mtime.toISOString(), previousVersion: error.previousVersion || previousVersion,
-            status: result, creationDatePreserved: false });
+            status: result, creationDatePreserved: false, physicalVerification: error.physicalVerification === true });
         }
         report.failures.push({ path: item.path, reason: error.message, metadataOnly: !!error.verifiedContent,
           expectedCreationDate: error.expectedCreationDate, actualCreationDate: error.actualCreationDate,
@@ -943,7 +962,9 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
         if (await fsp.realpath(path.dirname(target)) !== path.dirname(target)) throw new Error('La cartella di destinazione è cambiata dopo la copia.');
         if (!stats.isFile() || stats.isSymbolicLink() || stats.size !== record.bytes) throw new Error('File di destinazione mancante, incompleto o sostituito dopo la copia.');
         if (!matches(verifiedSnapshots.get(sourceKey), snapshot(stats))) {
-          if (await sha256(target, signal) !== record.sha256 || !sameResourceFork(record.resourceFork, await readResourceFork(target, signal)) || !matches(stats, await fsp.lstat(target))) throw new Error('Il contenuto di destinazione è cambiato dopo la verifica.');
+          const recheck = await verifyHash(target, signal);
+          if (!recheck.physical) record.physicalVerification = false;
+          if (recheck.hash !== record.sha256 || !sameResourceFork(record.resourceFork, await readResourceFork(target, signal)) || !matches(stats, await fsp.lstat(target))) throw new Error('Il contenuto di destinazione è cambiato dopo la verifica.');
         }
         if (!matches(original.stats, await fsp.lstat(original.path))) throw new Error('La sorgente è cambiata durante il controllo finale.');
         if (record.creationDatePreserved !== false) await requireCreationDate(target, original.stats, record.sha256, signal);
@@ -957,6 +978,9 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
       }
     }
     report.verifiedFiles = valid;
+    const cachedChecks = valid.filter(record => record.physicalVerification !== true).length;
+    report.physicalVerification = { files: valid.length - cachedChecks, cached: cachedChecks };
+    if (cachedChecks) report.warnings.push({ path: '', reason: `Verifica fisica non garantita per ${cachedChecks} file: il contenuto è stato riletto, ma il sistema potrebbe averlo fornito dalla memoria invece che dal disco.` });
     if (!mediaSeparation) {
       for (const directory of plan.directories) {
         try {
@@ -973,4 +997,4 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
   }
 }
 
-module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, readResourceFork, sameResourceFork, requireCreationDate, categorizeMediaFile, resolveExistingVolumePath, detectCaseCollisions };
+module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, verifyHash, readResourceFork, sameResourceFork, requireCreationDate, categorizeMediaFile, resolveExistingVolumePath, detectCaseCollisions };

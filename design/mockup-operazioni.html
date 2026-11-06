@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>SecureCopy — Mockup Operazioni</title>
+<style>
+  /* Tokens taken from src/appearance.css (copy section). Palette unchanged;
+     used as a depth scale instead of one flat tone. */
+  :root {
+    --bg: #0e171b;
+    --bg-deep: #0a1115;
+    --plane: #162125;          /* working surface: one plane, no border */
+    --plane-hover: #1b282d;
+    --line: rgba(223, 240, 235, .07);
+    --text: #edf3f3;
+    --muted: #a4b5b8;
+    --faint: #8a9ca0;
+    --accent: #2dd4bf;
+    --accent-ink: #062a27;
+    --primary: #148b8e;
+    --success: #86e3a0;
+    --success-ink: #0b2a16;
+    --track: rgba(237, 243, 243, .08);
+    --section-rgb: 45, 212, 191;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    font-size: 14px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  ::selection { background: rgba(45, 212, 191, .32); color: #fff; }
+  body {
+    background: #05090b;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    padding: 48px 56px 80px;
+    display: grid;
+    gap: 64px;
+    justify-content: center;
+  }
+  .state-label {
+    color: #6f8287;
+    font-size: 13px;
+    margin: 0 0 14px 4px;
+  }
+  .state-label strong { color: var(--muted); font-weight: 600; }
+
+  /* Window */
+  .window {
+    width: 1240px;
+    height: 800px;
+    border-radius: 12px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 208px 1fr;
+    background: linear-gradient(180deg, rgba(var(--section-rgb), .07), transparent 220px), var(--bg);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .06);
+    position: relative;
+  }
+  .window.done { --section-rgb: 134, 227, 160; }
+
+  /* Sidebar: identical to the app */
+  .sidebar {
+    background: rgba(10, 17, 21, .55);
+    border-right: 1px solid rgba(255, 255, 255, .05);
+    padding: 52px 12px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .traffic { position: absolute; top: 18px; left: 20px; display: flex; gap: 8px; }
+  .traffic i { width: 12px; height: 12px; border-radius: 50%; background: #3a4448; display: block; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 12px 30px; font-weight: 650; font-size: 17px; letter-spacing: -.3px; }
+  .brand img { width: 28px; height: 28px; }
+  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 9px; color: #a4b3bb; font-size: 13px; }
+  .nav-item svg { width: 18px; height: 18px; flex: none; }
+  .nav-item.selected { color: #e2f4f2; background: rgba(var(--section-rgb), .13); }
+  .nav-item .count { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .nav-divider { height: 1px; background: rgba(255, 255, 255, .06); margin: 14px 12px; }
+  .sidebar-bottom { margin-top: auto; }
+
+  /* Workspace */
+  .workspace { padding: 56px 48px 32px; display: flex; flex-direction: column; min-width: 0; }
+
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+  .route { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .route .media { width: 44px; height: 44px; flex: none; color: #7fb7e6; }
+  .route h1 { font-size: 28px; font-weight: 650; letter-spacing: -.6px; line-height: 1.15; white-space: nowrap; }
+  .route h1 .to { color: var(--faint); font-weight: 400; margin: 0 6px; }
+  .route p { color: var(--muted); font-size: 13px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  .eta { text-align: right; flex: none; }
+  .eta .big { font-size: 28px; font-weight: 600; letter-spacing: -.5px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .eta .big small { font-size: 16px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .eta p { color: var(--muted); font-size: 13px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  .overall { margin-top: 26px; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .overall span { display: block; height: 100%; width: 68%; border-radius: 3px; background: var(--accent); }
+
+  /* Destinations: rows on one plane */
+  .plane { margin-top: 36px; background: var(--plane); border-radius: 12px; }
+  .dest { display: grid; grid-template-columns: 36px 1fr 260px 150px; align-items: center; column-gap: 16px; padding: 18px 22px; }
+  .dest + .dest { border-top: 1px solid var(--line); }
+  .dest .drive { width: 30px; height: 30px; color: #8fd8c6; }
+  .dest .name { font-size: 15px; font-weight: 600; }
+  .dest .path { color: var(--faint); font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+  .phase { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  .phase b { color: var(--text); font-weight: 550; }
+  .rate { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .rate b { display: block; color: var(--text); font-weight: 600; font-size: 15px; }
+
+  /* Manifest: what has actually been secured, per destination */
+  .manifest { margin-top: 30px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .manifest-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .manifest-head h2 { font-size: 15px; font-weight: 600; }
+  .manifest-head span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 12px; font-weight: 500; color: var(--faint); padding: 0 0 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 0; font-size: 13px; border-bottom: 1px solid var(--line); color: var(--muted); }
+  td.file { color: var(--text); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+  td.size, th.size { text-align: right; padding-right: 28px; }
+  .st { display: inline-flex; align-items: center; gap: 6px; }
+  .st svg { width: 14px; height: 14px; }
+  .st.ok { color: var(--success); }
+  .st.run { color: var(--accent); }
+  .st.wait { color: #7c8e92; }
+  tr.current td { color: var(--text); }
+  tr.current td.file { color: var(--accent); }
+
+  .foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 8px; font-size: 13px; font-weight: 550; color: var(--text); background: rgba(237, 243, 243, .07); border: 0; font-family: inherit; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn.quiet { background: transparent; color: var(--muted); }
+  .btn.primary { background: var(--success); color: var(--success-ink); }
+
+  /* Done state */
+  .done .route .media { color: var(--success); }
+  .done .bar span, .done .overall span { background: var(--success); width: 100%; }
+  .done .dest .drive { color: var(--success); }
+  .proof { margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 12px; overflow: hidden; }
+  .proof div { background: var(--plane); padding: 18px 22px; }
+  .proof dt { font-size: 12px; color: var(--faint); }
+  .proof dd { font-size: 15px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .proof dd.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; font-weight: 500; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="13" rx="3"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/><path d="m11 14 2 2 4-4"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h6l2 3h10v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="m8 12-2 2 2 2m8-4 2 2-2 2m-2-5-3 8"/></symbol>
+    <symbol id="i-ops" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M7 2.5h7.5L19 7v13.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-17a1 1 0 0 1 1-1Z"/><path d="M9.5 2.5v4M12 2.5v4M14.5 2.5v4" stroke-linecap="round"/><path d="M9 15.5h6" stroke-linecap="round"/></symbol>
+    <symbol id="i-drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M5.5 13 8 5h8l2.5 8"/><circle cx="17" cy="16.5" r=".9" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/></symbol>
+    <symbol id="i-ring" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5.5" width="3.4" height="13" rx="1"/><rect x="13.6" y="5.5" width="3.4" height="13" rx="1"/></symbol>
+    <symbol id="i-eject" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5 4.5 14h15L12 5Z"/><rect x="4.5" y="16.5" width="15" height="2.5" rx="1"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 2.5h8l4 4v15H6Z"/><path d="M14 2.5v4h4M9 12h6M9 16h6" stroke-linecap="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.5 4.5 5.5v6c0 4.6 3.1 8.4 7.5 10 4.4-1.6 7.5-5.4 7.5-10v-6L12 2.5Z"/><path d="m8.5 12 2.5 2.5 4.5-5" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============ STATE 1: IN PROGRESS ============ -->
+<section>
+  <p class="state-label"><strong>1 · Copia in corso</strong> — due destinazioni, ognuna con la sua fase</p>
+  <div class="window">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <aside class="sidebar">
+      <div class="brand"><img src="data:image/png;base64,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" alt=""><span>SecureCopy</span></div>
+      <nav class="nav">
+        <div class="nav-item"><svg><use href="#i-home"/></svg>Panoramica</div>
+        <div class="nav-item"><svg><use href="#i-copy"/></svg>Copia sicura</div>
+        <div class="nav-item"><svg><use href="#i-compare"/></svg>Confronta cartelle</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item selected"><svg><use href="#i-ops"/></svg>Operazioni<span class="count">2</span></div>
+      </nav>
+      <div class="sidebar-bottom"><div class="nav-item"><svg><use href="#i-gear"/></svg>Impostazioni</div></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="head">
+        <div class="route">
+          <svg class="media"><use href="#i-card"/></svg>
+          <div>
+            <h1>SONY_FX3_A01<span class="to">→</span>2 dischi</h1>
+            <p>CFexpress · 24 clip · 168,4 GB</p>
+          </div>
+        </div>
+        <div class="eta">
+          <div class="big">12<small>min</small></div>
+          <p>68% · 16 di 24 file</p>
+        </div>
+      </header>
+      <div class="overall"><span></span></div>
+
+      <div class="plane">
+        <div class="dest">
+          <svg class="drive"><use href="#i-drive"/></svg>
+          <div>
+            <div class="name">RAID_MASTER</div>
+            <div class="path">PROGETTO_CINEMA / GIORNO_01</div>
+          </div>
+          <div>
+            <div class="phase"><b>Verifica da disco</b><span>74%</span></div>
+            <div class="bar"><span style="width:74%"></span></div>
+          </div>
+          <div class="rate"><b>412 MB/s</b>124,6 / 168,4 GB</div>
+        </div>
+        <div class="dest">
+          <svg class="drive"><use href="#i-drive"/></svg>
+          <div>
+            <div class="name">SSD_BACKUP_01</div>
+            <div class="path">PROGETTO_CINEMA / GIORNO_01</div>
+          </div>
+          <div>
+            <div class="phase"><b>Copia</b><span>62%</span></div>
+            <div class="bar"><span style="width:62%"></span></div>
+          </div>
+          <div class="rate"><b>273 MB/s</b>104,4 / 168,4 GB</div>
+        </div>
+      </div>
+
+      <section class="manifest">
+        <div class="manifest-head"><h2>File</h2><span>16 al sicuro su entrambi</span></div>
+        <table>
+          <thead><tr><th>Nome</th><th class="size">Dimensione</th><th>RAID_MASTER</th><th>SSD_BACKUP_01</th></tr></thead>
+          <tbody>
+            <tr><td class="file">A001_C012_1026C8_001.MOV</td><td class="size">6,2 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C013_1026D1_001.MOV</td><td class="size">7,8 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C014_1026E5_001.MOV</td><td class="size">5,5 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C015_1026F2_001.MOV</td><td class="size">6,9 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C016_1026G7_001.MOV</td><td class="size">7,4 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr class="current"><td class="file">A001_C017_1026H4_001.MOV</td><td class="size">7,2 GB</td><td><span class="st run"><svg><use href="#i-dot"/></svg>Verifica 81%</span></td><td><span class="st run"><svg><use href="#i-dot"/></svg>Copia 72%</span></td></tr>
+            <tr><td class="file">A001_C018_1026J0_001.MOV</td><td class="size">5,8 GB</td><td><span class="st wait"><svg><use href="#i-ring"/></svg>In coda</span></td><td><span class="st wait"><svg><use href="#i-ring"/></svg>In coda</span></td></tr>
+            <tr><td class="file">A001_C019_1026K3_001.MOV</td><td class="size">6,1 GB</td><td><span class="st wait"><svg><use href="#i-ring"/></svg>In coda</span></td><td><span class="st wait"><svg><use href="#i-ring"/></svg>In coda</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="foot">
+        <button class="btn quiet">Annulla</button>
+        <button class="btn"><svg><use href="#i-pause"/></svg>Pausa</button>
+      </footer>
+    </main>
+  </div>
+</section>
+
+<!-- ============ STATE 2: DONE ============ -->
+<section>
+  <p class="state-label"><strong>2 · Copia certificata</strong> — la schermata diventa la prova, l’azione è espellere la scheda</p>
+  <div class="window done">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <aside class="sidebar">
+      <div class="brand"><img src="data:image/png;base64,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" alt=""><span>SecureCopy</span></div>
+      <nav class="nav">
+        <div class="nav-item"><svg><use href="#i-home"/></svg>Panoramica</div>
+        <div class="nav-item"><svg><use href="#i-copy"/></svg>Copia sicura</div>
+        <div class="nav-item"><svg><use href="#i-compare"/></svg>Confronta cartelle</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item selected"><svg><use href="#i-ops"/></svg>Operazioni</div>
+      </nav>
+      <div class="sidebar-bottom"><div class="nav-item"><svg><use href="#i-gear"/></svg>Impostazioni</div></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="head">
+        <div class="route">
+          <svg class="media"><use href="#i-shield"/></svg>
+          <div>
+            <h1>24 file al sicuro su 2 dischi</h1>
+            <p>SONY_FX3_A01 · 168,4 GB · 14 min 22 s</p>
+          </div>
+        </div>
+        <button class="btn primary"><svg><use href="#i-eject"/></svg>Espelli SONY_FX3_A01</button>
+      </header>
+      <div class="overall"><span></span></div>
+
+      <div class="plane">
+        <div class="dest">
+          <svg class="drive"><use href="#i-drive"/></svg>
+          <div>
+            <div class="name">RAID_MASTER</div>
+            <div class="path">PROGETTO_CINEMA / GIORNO_01</div>
+          </div>
+          <div>
+            <div class="phase"><b>Certificato</b><span>24 / 24</span></div>
+            <div class="bar"><span></span></div>
+          </div>
+          <div class="rate"><b>396 MB/s</b>media</div>
+        </div>
+        <div class="dest">
+          <svg class="drive"><use href="#i-drive"/></svg>
+          <div>
+            <div class="name">SSD_BACKUP_01</div>
+            <div class="path">PROGETTO_CINEMA / GIORNO_01</div>
+          </div>
+          <div>
+            <div class="phase"><b>Certificato</b><span>24 / 24</span></div>
+            <div class="bar"><span></span></div>
+          </div>
+          <div class="rate"><b>288 MB/s</b>media</div>
+        </div>
+      </div>
+
+      <dl class="proof">
+        <div><dt>Verifica</dt><dd>Riletto dal disco · SHA-256</dd></div>
+        <div><dt>Problemi</dt><dd>Nessuno</dd></div>
+        <div><dt>Report</dt><dd class="mono">SecureCopy-verifica-0611.json</dd></div>
+      </dl>
+
+      <section class="manifest">
+        <div class="manifest-head"><h2>File</h2><span>24 su 24 verificati su entrambi</span></div>
+        <table>
+          <thead><tr><th>Nome</th><th class="size">Dimensione</th><th>RAID_MASTER</th><th>SSD_BACKUP_01</th></tr></thead>
+          <tbody>
+            <tr><td class="file">A001_C001_1026E8_001.MOV</td><td class="size">6,4 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C002_102641_001.MOV</td><td class="size">5,8 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C003_102692_001.MOV</td><td class="size">7,2 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C004_1026N3_001.MOV</td><td class="size">8,3 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C005_1026K9_001.MOV</td><td class="size">5,0 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+            <tr><td class="file">A001_C006_1026P1_001.MOV</td><td class="size">6,6 GB</td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td><td><span class="st ok"><svg><use href="#i-check"/></svg>Verificato</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+      <footer class="foot">
+        <button class="btn quiet">Nuova copia</button>
+        <button class="btn"><svg><use href="#i-folder"/></svg>Mostra nel Finder</button>
+        <button class="btn"><svg><use href="#i-doc"/></svg>Report PDF</button>
+      </footer>
+    </main>
+  </div>
+</section>
+
+</body>
+</html>

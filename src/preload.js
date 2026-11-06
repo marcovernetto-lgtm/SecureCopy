@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startBatch: (sourcePaths, destPaths, mode, policy) => ipcRenderer.invoke('start-batch', sourcePaths, destPaths, mode, policy),
     cancelCopy: (id) => ipcRenderer.invoke('cancel-copy', id),
     openCopyDestination: (id) => ipcRenderer.invoke('open-copy-destination', id),
+    ejectSource: (id) => ipcRenderer.invoke('eject-source', id),
     openReport: (id) => ipcRenderer.invoke('open-report', id),
     exportDITReport: (id) => ipcRenderer.invoke('export-dit-report', id),
     openReportsFolder: () => ipcRenderer.invoke('open-reports-folder'),
@@ -59,6 +60,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Event listeners
     onCopyLog: (callback) => ipcRenderer.on('copy-log', (event, data) => callback(data)),
     onCopyProgress: (callback) => ipcRenderer.on('copy-progress', (event, data) => callback(data)),
+    onCopyFileDone: (callback) => ipcRenderer.on('copy-file-done', (event, data) => callback(data)),
     onCopyFinished: (callback) => ipcRenderer.on('copy-finished', (_event, result) => callback(result)),
     onPlayCompletionSound: (callback) => ipcRenderer.on('play-completion-sound', (event, soundPath) => callback(soundPath)),
     onAppError: (callback) => ipcRenderer.on('app-error', (event, error) => callback(error)),

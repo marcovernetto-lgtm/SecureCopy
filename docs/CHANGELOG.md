@@ -1,3 +1,10 @@
+## 2.10.0 — 6 novembre 2026
+
+- **Nuova schermata Operazioni.** Le copie avviate insieme sono un'unica operazione: in alto cosa copi, dove e quanto manca; una riga per ogni disco con fase (copia o verifica da disco), velocità e GB scritti; l'elenco dei file con lo stato su ciascun disco, aggiornato file per file.
+- **Copia certificata.** A fine copia la schermata diventa la prova: file al sicuro e su quanti dischi, verifica riletta dal disco, problemi e report. Nuovo pulsante **Espelli** per la scheda sorgente, attivo solo se la copia è riuscita e nessun'altra copia la usa.
+- **Interfaccia più pulita.** Tolti banner fissi, etichette ridondanti e linee decorative di sfondo; il colore pieno resta solo sull'elemento che conta. Il verde del successo è distinto dal colore degli avvisi.
+- Traduzioni inglesi dei nuovi testi; screenshot e guida del README aggiornati.
+
 ## 2.9.0 — 6 novembre 2026
 
 - **Verifica dal disco, non dalla memoria.** Dopo la copia macOS teneva i dati appena scritti in memoria, quindi il controllo SHA-256 rileggeva la RAM e non il disco. Un nuovo helper nativo svuota la cache del disco (F_FULLFSYNC), toglie il file dalla memoria di sistema, controlla con mincore() che non ne resti nulla e lo rilegge con F_NOCACHE. Report JSON e PDF DIT indicano «Verificato da disco»; se l’helper manca compare un avviso esplicito.

@@ -63,19 +63,19 @@ All'avvio compare un banner dedicato:
 ---
 
 ### 4. Segui il trasferimento in tempo reale
-Mentre SecureCopy lavora, una grafica fluida e moderna ti mostra tutto ciò che sta accadendo:
-- La **velocità reale di trasferimento** (es. oltre 680 MB al secondo).
-- La percentuale complessiva e il file specifico in lavorazione.
-- La barra di verifica crittografica continua.
+Una sola schermata per tutta la copia, anche quando scrivi su più dischi insieme:
+- In alto, cosa stai copiando, dove, e **quanto manca**.
+- Una riga per ogni disco di destinazione, con la sua fase (copia o verifica da disco), la velocità e i GB scritti.
+- L'elenco dei file, con lo stato su ciascun disco: verificato, in lavorazione, in coda.
 
 ![Operazioni in corso](docs/screenshots/04-operazioni-live.png)
 
 ---
 
 ### 5. Copia finita e certificata al 100%
-Al termine, l'app emette un suono gradevole di notifica e ti mostra il riepilogo verde:
-- Clicca **Mostra nel Finder** per trovare subito i tuoi file copiati sul disco.
-- Clicca **Report PDF (DIT)** per salvare o stampare un documento ufficiale di avvenuta copia.
+A copia finita la schermata diventa la prova: quanti file sono al sicuro e su quanti dischi, riletti dal disco con SHA-256.
+- **Espelli** la scheda direttamente da qui, in sicurezza.
+- **Mostra nel Finder** e **Report PDF** per i file copiati e il documento di avvenuta copia.
 
 ![Copia completata](docs/screenshots/05-risultati-copia.png)
 

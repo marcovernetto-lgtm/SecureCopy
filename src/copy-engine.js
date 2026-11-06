@@ -798,7 +798,9 @@ async function copyFileVerified(item, destination, { signal, onBytes, onPhase, o
   }
 }
 
-async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onProgress, policy = 'replace', onlyPaths, allowMetadataDifferences = true, mediaSeparation = false }) {
+async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onProgress, onFileDone, policy = 'replace', onlyPaths, allowMetadataDifferences = true, mediaSeparation = false }) {
+  // Per-file outcome for the live manifest; never allowed to disturb the copy.
+  const fileDone = details => { try { onFileDone?.(details); } catch { /* UI only */ } };
   const selection = onlyPaths === undefined ? null : pathSelection(onlyPaths);
   const { sources, destRoot } = await preparePaths(sourceDirs, destDir);
   const rootGuard = await captureDirectory(destRoot);
@@ -914,6 +916,7 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
           createdAt: item.stats.birthtime.toISOString(), modifiedAt: item.stats.mtime.toISOString(), previousVersion, status: result, physicalVerification: verifiedPhysical });
         if (result === 'copied') report.transferredBytes += item.stats.size;
         onLog?.('SUCCESS', `${result === 'copied' ? 'Verificato' : result === 'kept' ? 'Saltato per scelta' : 'Già valido'}: ${relative}`);
+        fileDone({ file: relative, bytes: item.stats.size, status: result, physical: verifiedPhysical });
       } catch (error) {
         if (signal?.aborted || error.name === 'AbortError') throw error;
         if (error.verifiedContent) {
@@ -929,6 +932,7 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
           expectedCreationDate: error.expectedCreationDate, actualCreationDate: error.actualCreationDate,
           previousVersion: error.previousVersion || previousVersion, incompletePath: error.incompletePath || null });
         onLog?.('ERROR', `${relative}: ${error.message}`);
+        fileDone({ file: relative, bytes: item.stats.size, status: error.verifiedContent ? 'warning' : 'failed' });
       }
       report.filesProcessed++;
       report.bytesProcessed += item.stats.size;

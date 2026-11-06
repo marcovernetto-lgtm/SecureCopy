@@ -586,6 +586,7 @@ function startJob(item) {
     sourceDirs: item.sourceDirs, destDir: item.destDir, policy: item.policy || 'replace', onlyPaths: item.onlyPaths, signal: controller.signal,
     mediaSeparation: mediaSettings.mediaSeparation,
     waitIfPaused,
+    onFileDone: file => send('copy-file-done', { id: item.id, ...file }),
     onLog: (level, message) => sendLog(level, `[${item.description}] ${message}`),
     onProgress: progress => {
       const now = Date.now();
@@ -719,6 +720,23 @@ handle('export-dit-report', async id => {
   const { directory } = await managedDirectory(app.getPath('userData'), 'reports', { create: true });
   return await exportDITReportPDF(reportData, BrowserWindow, shell, directory);
 });
+// Ejects only the source volumes of a copy that finished without problems.
+handle('eject-source', async id => {
+  const item = completedJobs.find(job => job.id === id);
+  if (!item || item.kind === 'compare' || item.status !== 'completed' || process.platform !== 'darwin') return { ejected: [] };
+  const mounts = [...new Set((item.sourceDirs || []).filter(source => typeof source === 'string' && source.startsWith('/Volumes/'))
+    .map(source => source.split(path.sep).slice(0, 3).join(path.sep)))];
+  const ejected = [];
+  for (const mount of mounts) {
+    if (activeJobs.size && [...activeJobs.values()].some(job => job.item.sourceDirs.some(source => source.startsWith(mount + path.sep) || source === mount))) {
+      throw new Error(`${path.basename(mount)} è ancora usato da un'altra copia.`);
+    }
+    await new Promise((resolve, reject) => require('child_process').execFile('/usr/sbin/diskutil', ['eject', mount], error => error ? reject(new Error(`Impossibile espellere ${path.basename(mount)}: chiudi i file aperti e riprova.`)) : resolve()));
+    ejected.push(path.basename(mount));
+    sendLog('INFO', `Supporto ${path.basename(mount)} espulso in sicurezza.`);
+  }
+  return { ejected };
+});
 handle('open-copy-destination', async id => {
   const item = completedJobs.find(job => job.id === id);
   if (!item || item.kind === 'compare' || typeof item.destDir !== 'string') return false;
@@ -824,7 +842,9 @@ handle('start-batch', (sourceDirs, destDirs, mode, policy = 'replace') => {
   if (new Set(resolved).size !== resolved.length) throw new Error('Le destinazioni devono essere diverse.');
   const items = destDirs.map(destDir => makeItem(sourceDirs, destDir,
     `Copia ${sourceDirs.length > 1 ? `${sourceDirs.length} elementi` : path.basename(sourceDirs[0])} → ${destDir}`, mode));
-  for (const item of items) item.policy = policy;
+  // Copies started together are shown as one operation with a row per destination.
+  const batchId = crypto.randomUUID();
+  items.forEach((item, index) => { item.policy = policy; item.batchId = batchId; item.batchIndex = index; });
   if (mode === 'after') {
     const waitFor = [...activeJobs.keys(), ...(compareController ? [comparisonItem.id] : [])];
     for (const item of items) item.waitFor = waitFor;

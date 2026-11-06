@@ -305,6 +305,7 @@ function renderSelectedOperation(item) {
         }
         if (item.result) displayResult(item.result, item.id);
     }
+    renderOperationGroup(item);
 }
 
 // IPC Listeners
@@ -359,7 +360,7 @@ if (window.electronAPI) {
         updateCompareActions();
         const focused = operations.find(item => item.id === focusedJobId);
         if (focused) renderSelectedOperation(focused);
-        else resetProgressUI();
+        else { resetProgressUI(); renderOperationGroup(null); }
         updateAnimation();
         updateBackButton();
     });
@@ -2721,3 +2722,350 @@ function prepareFolderFlowCopy(request) {
     sourceBtn.focus({ preventScroll: true });
 }
 window.electronAPI?.onFolderFlowCopyRequested?.(prepareFolderFlowCopy);
+
+// ===== Operazioni: one operation, a row per destination, the file manifest =====
+// Copies started together share a batchId; each destination is its own job.
+const opMonitor = document.getElementById('monitor-screen');
+const opTitle = document.getElementById('monitor-title');
+const opRouteMeta = document.getElementById('op-route-meta');
+const opEta = document.getElementById('op-eta');
+const opDestinations = document.getElementById('op-destinations');
+const opProof = document.getElementById('op-proof');
+const opFiles = document.getElementById('op-files');
+const opFilesColumns = document.getElementById('op-files-columns');
+const opFilesBody = document.getElementById('op-files-body');
+const opFilesCount = document.getElementById('op-files-count');
+const ejectSourceBtn = document.getElementById('eject-source-btn');
+const ejectSourceLabel = document.getElementById('eject-source-label');
+const OP_SVG = 'http://www.w3.org/2000/svg';
+const opFileOutcomes = new Map();   // jobId -> Map(file -> { bytes, status })
+const opFileOrder = new Map();      // batch -> [file]
+const opLastSpeed = new Map();      // jobId -> bytes/s
+const opEjected = new Set();        // batch keys whose source was ejected
+let opFrame = 0;
+let opTableTimer = 0;
+let opLastTable = 0;
+
+const opBatch = item => item?.batchId || item?.id;
+const opJobs = item => operations.filter(op => op.kind !== 'compare' && opBatch(op) === opBatch(item))
+    .sort((a, b) => (a.batchIndex ?? 0) - (b.batchIndex ?? 0));
+const opFinished = job => Boolean(job.result) || ['completed', 'partial', 'failed', 'cancelled'].includes(job.status);
+const opBase = value => String(value || '').split(/[/\\]/).filter(Boolean).pop() || String(value || '');
+
+function opNumber(value, digits = 1) {
+    return new Intl.NumberFormat(document.documentElement.lang === 'en' ? 'en' : 'it', { maximumFractionDigits: digits }).format(value);
+}
+function opSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+    return `${opNumber(bytes / Math.pow(1024, i), i >= 3 ? 1 : 0)} ${units[i]}`;
+}
+function opDuration(ms) {
+    const s = Math.max(1, Math.round(ms / 1000));
+    if (s < 60) return `${s} s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} min ${s % 60} s`;
+    return `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+function opDisk(dest) {
+    const parts = String(dest || '').split(/[/\\]/).filter(Boolean);
+    if (parts[0] === 'Volumes' && parts[1]) return { name: parts[1], path: parts.slice(2).join(' / ') };
+    return { name: parts.at(-1) || dest, path: parts.slice(0, -1).join(' / ') };
+}
+function opSourceLabel(job) {
+    const sources = job.sourceDirs || [];
+    return sources.length === 1 ? opBase(sources[0]) : `${sources.length} elementi`;
+}
+function opSourceVolume(job) {
+    const source = (job.sourceDirs || []).find(dir => String(dir).startsWith('/Volumes/'));
+    return source ? source.split('/')[2] : null;
+}
+function opIcon(name) {
+    const svg = document.createElementNS(OP_SVG, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const shapes = {
+        drive: [['rect', { x: 3, y: 13, width: 18, height: 7, rx: 2 }], ['path', { d: 'M5.5 13 8 5h8l2.5 8' }], ['circle', { cx: 17, cy: 16.5, r: 0.9, fill: 'currentColor', stroke: 'none' }]],
+        check: [['path', { d: 'm5 12.5 4.5 4.5L19 7.5' }]],
+        dot: [['circle', { cx: 12, cy: 12, r: 4, fill: 'currentColor', stroke: 'none' }]],
+        ring: [['circle', { cx: 12, cy: 12, r: 5 }]],
+        warn: [['path', { d: 'M12 4 2.8 20h18.4Z' }], ['path', { d: 'M12 10v4.5m0 2.5v.01' }]],
+        fail: [['path', { d: 'm7 7 10 10M17 7 7 17' }]]
+    }[name] || [];
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', name === 'drive' ? '1.5' : '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    for (const [tag, attrs] of shapes) {
+        const el = document.createElementNS(OP_SVG, tag);
+        for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+        svg.append(el);
+    }
+    return svg;
+}
+function opEl(tag, className, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text !== undefined) el.textContent = text;
+    return el;
+}
+
+function opJobView(job) {
+    const p = latestProgress.get(job.id) || {};
+    if (opFinished(job)) {
+        const r = job.result || {};
+        const status = r.status || job.status;
+        const ok = (r.copied || 0) + (r.skipped || 0);
+        const total = r.totalFiles ?? job.totalFiles ?? 0;
+        const speed = opLastSpeed.get(job.id);
+        return { state: status === 'completed' ? 'done' : 'problem',
+            label: { completed: 'Certificato', partial: 'Da controllare', failed: 'Non riuscita', cancelled: 'Interrotta' }[status] || 'Terminata',
+            right: `${ok} / ${total}`, pct: status === 'completed' ? 100 : Math.min(99, job.progress || 0),
+            rate: speed ? `${opSize(speed)}/s` : '', sub: speed ? 'media' : '' };
+    }
+    if (job.status === 'pending') return { state: 'waiting', label: 'In attesa', right: '', pct: 0, rate: '', sub: '' };
+    const pct = Math.max(0, Math.min(99, p.percentage ?? job.progress ?? 0));
+    const paused = job.status === 'paused' || job.status === 'pausing' || job.paused;
+    const label = paused ? 'In pausa' : ({ scan: 'Preparazione', compare: 'Controllo', copy: 'Copia', verify: 'Verifica da disco' }[p.phase] || 'In corso');
+    return { state: 'running', label, right: `${pct}%`, pct,
+        rate: p.averageSpeedBytesPerSec ? `${opSize(p.averageSpeedBytesPerSec)}/s` : '',
+        sub: p.totalBytes ? `${opSize(p.bytesProcessed || 0)} / ${opSize(p.totalBytes)}` : '' };
+}
+
+function opEtaMs(jobs) {
+    let worst = 0;
+    for (const job of jobs) {
+        if (opFinished(job)) continue;
+        if (job.status !== 'processing' || job.paused) return null;
+        const pct = latestProgress.get(job.id)?.percentage ?? job.progress ?? 0;
+        if (!job.startedAt || pct < 2) return null;
+        const elapsed = Date.now() - Date.parse(job.startedAt);
+        worst = Math.max(worst, elapsed * (100 - pct) / pct);
+    }
+    return worst || null;
+}
+function opRenderEta(ms) {
+    opEta.replaceChildren();
+    if (!ms) { opEta.hidden = true; return; }
+    const minutes = Math.ceil(ms / 60000);
+    if (minutes < 60) {
+        opEta.append(document.createTextNode(minutes <= 1 ? '<1' : String(minutes)), opEl('small', '', 'min'));
+    } else {
+        opEta.append(document.createTextNode(String(Math.floor(minutes / 60))), opEl('small', '', 'h'),
+            document.createTextNode(` ${String(minutes % 60).padStart(2, '0')}`), opEl('small', '', 'min'));
+    }
+    opEta.hidden = false;
+}
+
+function opRenderDestinations(jobs) {
+    opDestinations.replaceChildren();
+    for (const job of jobs) {
+        const view = opJobView(job);
+        const disk = opDisk(job.destDir);
+        const row = opEl('div', 'op-dest');
+        row.dataset.state = view.state;
+        row.title = job.destDir || '';
+        const icon = opIcon('drive'); icon.classList.add('op-dest-icon');
+        const who = opEl('div');
+        who.append(opEl('div', 'op-dest-name', disk.name), opEl('div', 'op-dest-path', disk.path || job.destDir || ''));
+        const progress = opEl('div');
+        const phase = opEl('div', 'op-dest-phase');
+        phase.append(opEl('b', '', view.label), opEl('span', '', view.right));
+        const bar = opEl('div', 'op-bar'); const fill = opEl('span'); fill.style.width = `${view.pct}%`; bar.append(fill);
+        progress.append(phase, bar);
+        const rate = opEl('div', 'op-dest-rate');
+        if (view.rate) rate.append(opEl('b', '', view.rate));
+        rate.append(document.createTextNode(view.sub));
+        row.append(icon, who, progress, rate);
+        opDestinations.append(row);
+    }
+    opDestinations.hidden = jobs.length === 0;
+}
+
+function opCell(job, file, outcome) {
+    if (outcome) {
+        const kind = { copied: ['ok', 'check', 'Verificato'], skipped: ['ok', 'check', 'Già presente'], kept: ['warn', 'warn', 'Saltato'],
+            warning: ['warn', 'warn', 'Da controllare'], failed: ['fail', 'fail', 'Non copiato'] }[outcome.status] || ['wait', 'ring', '—'];
+        const span = opEl('span', `op-st ${kind[0]}`); span.append(opIcon(kind[1]), document.createTextNode(kind[2])); return span;
+    }
+    const p = latestProgress.get(job.id);
+    if (!opFinished(job) && p?.currentFile === file) {
+        const reading = p.phase !== 'copy' && p.readTotal > 0;
+        const total = reading ? p.readTotal : p.currentFileTotal || 0;
+        const done = reading ? p.readBytes || 0 : p.currentFileBytes || 0;
+        const label = { compare: 'Controllo', copy: 'Copia', verify: 'Verifica' }[p.phase] || 'In corso';
+        const span = opEl('span', 'op-st run');
+        span.append(opIcon('dot'), document.createTextNode(total ? `${label} ${Math.min(100, Math.round(done / total * 100))}%` : label));
+        return span;
+    }
+    const span = opEl('span', 'op-st wait');
+    span.append(opIcon('ring'), document.createTextNode(opFinished(job) ? '—' : 'In coda'));
+    return span;
+}
+
+function opRenderFiles(jobs, done) {
+    const key = opBatch(jobs[0]);
+    const order = [...(opFileOrder.get(key) || [])];
+    for (const job of jobs) {
+        const current = latestProgress.get(job.id)?.currentFile;
+        if (!opFinished(job) && current && !order.includes(current)) order.push(current);
+    }
+    opFiles.hidden = order.length === 0;
+    if (!order.length) return;
+    opFilesColumns.replaceChildren(opEl('th', '', 'Nome'), opEl('th', 'op-size', 'Dimensione'),
+        ...jobs.map(job => opEl('th', '', opDisk(job.destDir).name)));
+    const limit = done ? 500 : 200;
+    const visible = done ? order.slice(0, limit) : order.slice(-limit);
+    const scroller = opFilesBody.closest('.op-files-scroll');
+    const pinned = scroller && scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 40;
+    const rows = visible.map(file => {
+        const tr = opEl('tr');
+        const outcomes = jobs.map(job => opFileOutcomes.get(job.id)?.get(file));
+        const bytes = outcomes.find(Boolean)?.bytes ?? jobs.map(job => latestProgress.get(job.id)).find(p => p?.currentFile === file)?.currentFileTotal;
+        if (!outcomes.every(Boolean)) tr.className = 'op-current';
+        const name = opEl('td', 'op-file', file); name.title = file;
+        tr.append(name, opEl('td', 'op-size', bytes ? opSize(bytes) : ''));
+        jobs.forEach((job, index) => { const td = opEl('td'); td.append(opCell(job, file, outcomes[index])); tr.append(td); });
+        return tr;
+    });
+    opFilesBody.replaceChildren(...rows);
+    if (!done && pinned && scroller) scroller.scrollTop = scroller.scrollHeight;
+    const secure = order.filter(file => jobs.every(job => ['copied', 'skipped'].includes(opFileOutcomes.get(job.id)?.get(file)?.status))).length;
+    if (done) {
+        const total = jobs[0].result?.totalFiles ?? order.length;
+        opFilesCount.textContent = `${secure} su ${total} verificati${jobs.length > 1 ? ' su tutti i dischi' : ''}${order.length > limit ? ` · primi ${limit} mostrati` : ''}`;
+    } else opFilesCount.textContent = jobs.length > 1 ? `${secure} al sicuro su tutti i dischi` : `${secure} verificati`;
+}
+
+function opRenderProof(jobs, focused) {
+    const results = jobs.map(job => job.result || {});
+    const cached = results.reduce((sum, r) => sum + (r.physicalVerification?.cached || 0), 0);
+    const known = results.some(r => r.physicalVerification);
+    const problems = results.reduce((sum, r) => sum + (r.failures?.length || 0), 0);
+    const report = (focused.result || results.find(r => r.reportPath) || {}).reportPath;
+    const items = [['Verifica', known && cached === 0 ? 'Riletto dal disco · SHA-256' : 'SHA-256'],
+        ['Problemi', problems ? String(problems) : 'Nessuno'], ['Report', report ? opBase(report) : '—', true]];
+    opProof.replaceChildren(...items.map(([term, value, mono]) => {
+        const box = opEl('div'); const dd = opEl('dd', mono ? 'op-mono' : '', value); if (mono) dd.title = report || '';
+        box.append(opEl('dt', '', term), dd); return box;
+    }));
+}
+
+function renderOperationGroup(focused) {
+    if (!opMonitor) return;
+    if (!focused || focused.kind === 'compare') {
+        opMonitor.dataset.op = focused ? 'compare' : '';
+        delete opMonitor.dataset.opState;
+        opTitle.textContent = 'Operazioni';
+        opRouteMeta.hidden = true; opEta.hidden = true;
+        opDestinations.hidden = true; opFiles.hidden = true; opProof.hidden = true;
+        ejectSourceBtn.classList.add('hidden');
+        return;
+    }
+    const jobs = opJobs(focused);
+    if (!jobs.length) return;
+    const first = jobs[0];
+    const progress = latestProgress.get(first.id) || {};
+    const allDone = jobs.every(opFinished);
+    const allOk = allDone && jobs.every(job => (job.result?.status || job.status) === 'completed');
+    opMonitor.dataset.op = 'copy';
+    // The list of operations only adds information when other operations exist.
+    queueContainer?.classList.toggle('hidden', operations.every(op => opBatch(op) === opBatch(focused)));
+    opMonitor.dataset.opState = allOk ? 'done' : allDone ? 'problem' : 'running';
+    const n = jobs.length;
+    const where = n === 1 ? opDisk(first.destDir).name : `${n} dischi`;
+    const totalFiles = first.result?.totalFiles ?? progress.totalFiles ?? first.totalFiles ?? 0;
+    const totalBytes = first.result?.totalBytes ?? progress.totalBytes ?? 0;
+    if (allOk) {
+        opTitle.textContent = `${totalFiles} file al sicuro su ${n === 1 ? where : `${n} dischi`}`;
+        const started = Math.min(...jobs.map(job => Date.parse(job.startedAt)).filter(Number.isFinite));
+        const ended = Math.max(...jobs.map(job => Date.parse(job.completedAt)).filter(Number.isFinite));
+        opRouteMeta.textContent = [opSourceLabel(first), totalBytes ? opSize(totalBytes) : '', Number.isFinite(started) && Number.isFinite(ended) ? opDuration(ended - started) : '']
+            .filter(Boolean).join(' · ');
+    } else if (allDone) {
+        const problems = jobs.reduce((sum, job) => sum + (job.result?.failures?.length || 0), 0);
+        opTitle.textContent = problems ? `${problems} ${problems === 1 ? 'elemento da controllare' : 'elementi da controllare'}` : 'Copia interrotta';
+        opRouteMeta.textContent = `${opSourceLabel(first)} → ${where}`;
+    } else {
+        opTitle.textContent = `${opSourceLabel(first)} → ${where}`;
+        opRouteMeta.textContent = progress.phase === 'scan' ? `${progress.filesFound || 0} file trovati`
+            : totalFiles ? `${totalFiles} file · ${opSize(totalBytes)}` : '';
+    }
+    opTitle.title = (first.sourceDirs || []).join(', ');
+    opRouteMeta.hidden = !opRouteMeta.textContent;
+
+    const views = jobs.map(opJobView);
+    const pct = Math.round(views.reduce((sum, view) => sum + view.pct, 0) / n);
+    progressBar.style.width = `${allOk ? 100 : pct}%`;
+    progressBar.dataset.status = allOk ? 'completed' : allDone ? (jobs.find(job => (job.result?.status || job.status) !== 'completed')?.result?.status || 'partial') : 'processing';
+    progressPercentage.textContent = `${pct}%`;
+    const secureAll = Math.min(...jobs.map(job => job.result ? (job.result.copied || 0) + (job.result.skipped || 0) : latestProgress.get(job.id)?.filesProcessed ?? job.filesProcessed ?? 0));
+    progressDetails.textContent = totalFiles ? `${secureAll} di ${totalFiles} file` : '';
+    opRenderEta(allDone ? null : opEtaMs(jobs));
+    opRenderDestinations(jobs);
+
+    opProof.hidden = !allOk;
+    if (allOk) opRenderProof(jobs, focused);
+    const volume = opSourceVolume(first);
+    ejectSourceBtn.classList.toggle('hidden', !allOk || !volume);
+    if (allOk && volume) {
+        const ejected = opEjected.has(opBatch(first));
+        ejectSourceLabel.textContent = ejected ? `${volume} espulso` : `Espelli ${volume}`;
+        ejectSourceBtn.disabled = ejected;
+    }
+    // The table is the heaviest part: rebuild it at most a few times a second.
+    const now = Date.now();
+    clearTimeout(opTableTimer);
+    if (allDone || now - opLastTable > 300) { opLastTable = now; opRenderFiles(jobs, allDone); }
+    else opTableTimer = setTimeout(() => { opLastTable = Date.now(); opRenderFiles(opJobs(focused), opJobs(focused).every(opFinished)); }, 300);
+}
+
+function scheduleOperationRender() {
+    if (opFrame) return;
+    opFrame = requestAnimationFrame(() => {
+        opFrame = 0;
+        if (currentScreen !== 'monitor') return;
+        renderOperationGroup(operations.find(item => item.id === focusedJobId));
+    });
+}
+
+if (window.electronAPI) {
+    window.electronAPI.onCopyFileDone?.((data) => {
+        if (!data?.id || !data.file) return;
+        const job = operations.find(item => item.id === data.id);
+        if (!opFileOutcomes.has(data.id)) opFileOutcomes.set(data.id, new Map());
+        opFileOutcomes.get(data.id).set(data.file, { bytes: data.bytes, status: data.status });
+        const key = job ? opBatch(job) : data.id;
+        if (!opFileOrder.has(key)) opFileOrder.set(key, []);
+        const order = opFileOrder.get(key);
+        if (!order.includes(data.file)) order.push(data.file);
+        const focused = operations.find(item => item.id === focusedJobId);
+        if (focused && job && opBatch(job) === opBatch(focused)) scheduleOperationRender();
+    });
+    window.electronAPI.onCopyProgress((data) => {
+        if (!data?.id) return;
+        if (data.averageSpeedBytesPerSec) opLastSpeed.set(data.id, data.averageSpeedBytesPerSec);
+        const job = operations.find(item => item.id === data.id);
+        const focused = operations.find(item => item.id === focusedJobId);
+        if (!job || !focused || opBatch(job) !== opBatch(focused)) return;
+        if (!job.result) latestProgress.set(data.id, data);
+        scheduleOperationRender();
+    });
+    window.electronAPI.onCopyFinished(() => scheduleOperationRender());
+}
+ejectSourceBtn?.addEventListener('click', async () => {
+    const focused = operations.find(item => item.id === focusedJobId);
+    if (!focused) return;
+    ejectSourceBtn.disabled = true;
+    try {
+        const { ejected = [] } = await window.electronAPI.ejectSource(focused.id);
+        if (ejected.length) opEjected.add(opBatch(focused));
+        else ejectSourceBtn.disabled = false;
+    } catch (error) {
+        ejectSourceBtn.disabled = false;
+        showError(error.message);
+    }
+    renderOperationGroup(focused);
+});

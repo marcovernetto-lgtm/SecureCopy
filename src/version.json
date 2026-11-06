@@ -1,17 +1,17 @@
 {
-  "version": "2.9.0",
+  "version": "2.10.0",
   "build": 1,
   "releaseDate": "2026-11-06",
   "notes": {
-    "it": "Verifica della copia letta dal disco e non dalla memoria, aggiornamenti verificati con checksum, report PDF più sicuro e separazione Video/RAW/JPEG più veloce e corretta.",
-    "en": "Copies are verified from the disk instead of memory, updates are checksum-verified, safer PDF reports and faster, more accurate Video/RAW/JPEG separation."
+    "it": "Nuova schermata Operazioni: una riga per ogni disco, tempo rimanente, stato di ogni file e copia certificata con espulsione della scheda.",
+    "en": "New Operations screen: a row per disk, time remaining, per-file status and a certified result with card eject."
   },
   "downloads": {
-    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.9.0/SecureCopy-2.9.0-arm64.dmg",
-    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.9.0/SecureCopy-2.9.0-x64.dmg"
+    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.0/SecureCopy-2.10.0-arm64.dmg",
+    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.0/SecureCopy-2.10.0-x64.dmg"
   },
   "sha256": {
-    "arm64": "17de186890322b45dfc51e34d82bae3033f03e21142134419d9ef76e0263b9cd",
-    "x64": "b0294e411cf2c05ad9fea71a9c6e2acf75ba3c3e5c6143969c3e36a0ff44e24c"
+    "arm64": "32107ac51a22a3df93d59f4abf481027b3c001e8050515081caa08ca606ebce0",
+    "x64": "5b4a089f77be563ff092f081d21e91d0561caeddb997bfb7db38e5be9d36df83"
   }
 }

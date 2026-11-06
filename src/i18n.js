@@ -134,6 +134,28 @@
     'In attesa': 'Waiting',
     'Avvia coda': 'Start queue',
     'Nuova copia': 'New copy',
+    'Certificato': 'Certified',
+    'Da controllare': 'Needs review',
+    'Non riuscita': 'Failed',
+    'Interrotta': 'Stopped',
+    'Copia': 'Copy',
+    'Verifica da disco': 'Verifying from disk',
+    'Verificato': 'Verified',
+    'Già presente': 'Already present',
+    'Saltato': 'Skipped',
+    'Non copiato': 'Not copied',
+    'In coda': 'Queued',
+    'Problemi': 'Problems',
+    'Nessuno': 'None',
+    'Report': 'Report',
+    'Riletto dal disco · SHA-256': 'Re-read from disk · SHA-256',
+    'Nome': 'Name',
+    'Dimensione': 'Size',
+    'File': 'Files',
+    'media': 'average',
+    'Report PDF': 'PDF report',
+    'Riprova i file non copiati': 'Retry files not copied',
+    'Copia interrotta': 'Copy stopped',
     'Nuovo confronto': 'New comparison',
     'Pronto': 'Ready',
     'Nessuna operazione selezionata': 'No operation selected',
@@ -322,6 +344,19 @@
       return `Missing files — ${match[1]} missing, ${match[2]} to review.`;
     if ((match = value.match(/^Copia da verificare — (\d+) elementi con differenze\.$/)))
       return `Copy needs review — ${match[1]} different items.`;
+    if ((match = value.match(/^(\d+) file al sicuro su (\d+) dischi$/))) return `${match[1]} files secured on ${match[2]} disks`;
+    if ((match = value.match(/^(\d+) file al sicuro su (.+)$/))) return `${match[1]} files secured on ${match[2]}`;
+    if ((match = value.match(/^(.+) → (\d+) dischi$/))) return `${match[1]} → ${match[2]} disks`;
+    if ((match = value.match(/^(\d+) file · (.+)$/))) return `${match[1]} files · ${match[2]}`;
+    if ((match = value.match(/^(\d+) di (\d+) file$/))) return `${match[1]} of ${match[2]} files`;
+    if ((match = value.match(/^(\d+) al sicuro su tutti i dischi$/))) return `${match[1]} secured on every disk`;
+    if ((match = value.match(/^(\d+) verificati$/))) return `${match[1]} verified`;
+    if ((match = value.match(/^(\d+) su (\d+) verificati( su tutti i dischi)?(.*)$/))) return `${match[1]} of ${match[2]} verified${match[3] ? ' on every disk' : ''}${match[4].replace(' · primi ', ' · first ').replace(' mostrati', ' shown')}`;
+    if ((match = value.match(/^(\d+) (elemento|elementi) da controllare$/))) return `${match[1]} ${match[1] === '1' ? 'item' : 'items'} to review`;
+    if ((match = value.match(/^Espelli (.+)$/))) return `Eject ${match[1]}`;
+    if ((match = value.match(/^(.+) espulso$/))) return `${match[1]} ejected`;
+    if ((match = value.match(/^(Copia|Controllo|Verifica) (\d+)%$/))) return `${({ Copia: 'Copy', Controllo: 'Checking', Verifica: 'Verifying' })[match[1]]} ${match[2]}%`;
+    if ((match = value.match(/^(\d+) file trovati$/))) return `${match[1]} files found`;
     if ((match = value.match(/^Verifica fisica non garantita per (\d+) file: .*$/)))
       return `Physical verification not guaranteed for ${match[1]} files: the content was re-read, but the system may have served it from memory instead of the disk.`;
     if ((match = value.match(/^Metadati non conservati: (.*)\.$/)))

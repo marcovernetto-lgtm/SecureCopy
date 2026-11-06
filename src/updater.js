@@ -118,7 +118,7 @@ function createUpdater(options = {}) {
     try {
       return appRef?.getVersion() || require('./package.json').version;
     } catch {
-      return '2.9.0';
+      return '2.10.0';
     }
   });
   const getLanguage = options.getLanguage || (() => 'it');

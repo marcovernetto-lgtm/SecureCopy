@@ -1,3 +1,7 @@
+## 2.10.3 — 6 novembre 2026
+
+- Elenco dei file in Operazioni come riquadro: linea sotto «File», intestazione (Nome, Dimensione, dischi) sempre visibile, area di scorrimento alta un numero intero di righe che si aggancia alle righe, così nessun file appare tagliato.
+
 ## 2.10.2 — 6 novembre 2026
 
 - Operazioni: «Nuova copia» staccata dal titolo; tolte barra e percentuale generali, l'avanzamento resta nelle righe dei dischi con tempo rimanente e numero di file in alto.

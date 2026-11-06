@@ -1244,3 +1244,14 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 /* Back link set apart from the title (overrides the shared 3-row heading grid). */
 .monitor-screen .page-heading.op-heading > .op-heading-main { display: flex; flex-direction: column; row-gap: 0; }
 .monitor-screen .page-heading.op-heading .back-link { margin: 0 0 22px; }
+
+/* File list as a framed box: fixed header between two rules, rows of fixed
+   height that snap, so no file is ever shown cut in half. */
+.op-files-frame { border-top: 1px solid var(--op-line); border-bottom: 1px solid var(--op-line); }
+.op-files-columns-table th { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--op-line); }
+.op-files-scroll { max-height: 320px; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
+.op-files-table tbody tr { scroll-snap-align: start; }
+.op-files-table td { height: 40px; padding: 0 12px 0 0; box-sizing: border-box; vertical-align: middle; }
+.op-files-table tbody tr:last-child td { border-bottom: 0; }
+.op-files-table th:first-child { width: auto; }
+.op-files-table .op-size { width: auto; }

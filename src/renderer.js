@@ -2933,6 +2933,15 @@ function opRenderFiles(jobs, done) {
     if (!order.length) return;
     opFilesColumns.replaceChildren(opEl('th', '', 'Nome'), opEl('th', 'op-size', 'Dimensione'),
         ...jobs.map(job => opEl('th', '', opDisk(job.destDir).name)));
+    // Header and body are separate tables (the header never scrolls away):
+    // identical column widths keep them aligned.
+    for (const id of ['op-files-cols-head', 'op-files-cols-body']) {
+        const group = document.getElementById(id);
+        if (group.children.length === jobs.length + 2) continue;
+        const cols = [opEl('col'), opEl('col'), ...jobs.map(() => opEl('col'))];
+        cols[0].style.width = '42%'; cols[1].style.width = '120px';
+        group.replaceChildren(...cols);
+    }
     const limit = done ? 500 : 200;
     const visible = done ? order.slice(0, limit) : order.slice(-limit);
     const scroller = opFilesBody.closest('.op-files-scroll');
@@ -2949,6 +2958,9 @@ function opRenderFiles(jobs, done) {
         return tr;
     });
     opFilesBody.replaceChildren(...rows);
+    // Show a whole number of rows so the list never ends on a half-cut file.
+    const rowHeight = opFilesBody.firstElementChild?.getBoundingClientRect().height;
+    if (scroller && rowHeight) scroller.style.maxHeight = `${Math.round(rowHeight) * 8}px`;
     if (!done && pinned && scroller) scroller.scrollTop = scroller.scrollHeight;
     const secure = order.filter(file => jobs.every(job => ['copied', 'skipped'].includes(opFileOutcomes.get(job.id)?.get(file)?.status))).length;
     if (done) {

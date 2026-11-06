@@ -26,8 +26,8 @@ Tutti noi siamo abituati a fare "Copia e Incolla" o a trascinare i file da una c
 3. ❌ **Non può fare copie doppie simultanee:** Sei costretto a copiare prima su un disco, poi aspettare ore e ricopiare sul secondo disco di backup.
 
 ### ✨ Come ti protegge SecureCopy?
-- 🔒 **Impronta digitale invisibile (Checksum SHA-256):** SecureCopy legge ogni singolo byte dell'originale e della copia. Se anche un solo pixel cambia, se ne accorge all'istante e ti avvisa. Solo quando il controllo è perfetto al 100%, il file viene certificato.
-- 👯 **Copia multipla in un solo passaggio:** Puoi selezionare la tua scheda e dire all'app: *"Copiala contemporaneamente sia sull'hard disk principale che sul disco di riserva"*.
+- 🔒 **Impronta digitale invisibile (Checksum SHA-256):** SecureCopy legge ogni singolo byte dell'originale e della copia. Se anche un solo pixel cambia, se ne accorge all'istante e ti avvisa. Solo quando il controllo è perfetto al 100%, il file viene certificato. La copia viene riletta direttamente dal disco, non dalla memoria del Mac, così un errore di scrittura non può sfuggire.
+- 👯 **Copia multipla in parallelo:** Puoi selezionare la tua scheda e dire all'app: *"Copiala contemporaneamente sia sull'hard disk principale che sul disco di riserva"*.
 - 🔄 **Se si stacca il cavo, riparti da dove eri:** Se il computer si spegne o la scheda viene sfilata, al riavvio SecureCopy sa esattamente cosa mancava.
 
 ---

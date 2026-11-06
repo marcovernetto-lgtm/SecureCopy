@@ -33,25 +33,59 @@ const CAMERA_JUNK_DIRS = new Set([
   'dcim', 'private', 'm4root', 'clip', 'contents', 'clpr', 'sub', 'bavc', 'xdroot', 'cueup', 'medpro'
 ]);
 
-function categorizeMediaFile(filePath, allFiles) {
-  const ext = path.extname(filePath || '').toLowerCase();
+// DCF camera folders: three digits (100-999) followed by five characters,
+// e.g. 100CANON, 101MSDCF, 100_FUJI. Longer names are the user's own folders.
+const CAMERA_DCF_DIR = /^[1-9]\d{2}[a-z0-9_]{5}$/i;
+
+function categoryForExtension(ext) {
   if (VIDEO_EXTENSIONS.has(ext)) return 'Video';
   if (RAW_PHOTO_EXTENSIONS.has(ext)) return 'Foto RAW';
   if (JPEG_PHOTO_EXTENSIONS.has(ext)) return 'Foto JPEG';
+  return null;
+}
+
+// Built once per plan: categorising every file used to rescan the whole plan
+// for each file, which grows quadratically on large cards.
+const mediaIndexes = new WeakMap();
+function mediaIndex(allFiles) {
+  if (!Array.isArray(allFiles)) return null;
+  let index = mediaIndexes.get(allFiles);
+  if (index) return index;
+  index = { byBaseName: new Map(), byStem: new Map(), byName: new Map() };
+  for (const file of allFiles) {
+    const filePath = file.path || file;
+    const base = path.basename(filePath);
+    index.byBaseName.set(base, (index.byBaseName.get(base) || 0) + 1);
+    const category = categoryForExtension(path.extname(base).toLowerCase());
+    if (!category) continue;
+    const dir = path.dirname(filePath);
+    const lower = base.toLowerCase();
+    const stemKey = `${dir}\0${lower.slice(0, lower.length - path.extname(lower).length)}`;
+    if (!index.byStem.has(stemKey)) index.byStem.set(stemKey, new Set());
+    index.byStem.get(stemKey).add(category);
+    index.byName.set(`${dir}\0${lower}`, category);
+  }
+  mediaIndexes.set(allFiles, index);
+  return index;
+}
+
+function categorizeMediaFile(filePath, allFiles) {
+  const ext = path.extname(filePath || '').toLowerCase();
+  const direct = categoryForExtension(ext);
+  if (direct) return direct;
 
   if (ext === '.xmp') {
-    const baseWithoutExt = path.basename(filePath).replace(/\.xmp$/i, '').toLowerCase();
-    const match = allFiles?.find(f => {
-      const p = f.path || f;
-      if (p === filePath) return false;
-      const b = path.basename(p).toLowerCase();
-      return b.startsWith(baseWithoutExt) || b === baseWithoutExt;
-    });
-    if (match) {
-      const matchExt = path.extname(match.path || match).toLowerCase();
-      if (RAW_PHOTO_EXTENSIONS.has(matchExt)) return 'Foto RAW';
-      if (JPEG_PHOTO_EXTENSIONS.has(matchExt)) return 'Foto JPEG';
-      if (VIDEO_EXTENSIONS.has(matchExt)) return 'Video';
+    // Sidecars sit next to their media: IMG_0001.XMP or IMG_0001.CR3.xmp.
+    const index = mediaIndex(allFiles);
+    if (index) {
+      const dir = path.dirname(filePath);
+      const base = path.basename(filePath).replace(/\.xmp$/i, '').toLowerCase();
+      const named = index.byName.get(`${dir}\0${base}`);
+      if (named) return named;
+      const categories = index.byStem.get(`${dir}\0${base}`);
+      if (categories) {
+        for (const category of ['Foto RAW', 'Foto JPEG', 'Video']) if (categories.has(category)) return category;
+      }
     }
     return 'Foto RAW';
   }
@@ -68,12 +102,12 @@ function getCleanRelativePath(itemRelative, category, planFiles) {
   const meaningfulSegments = segments.slice(0, -1).filter(seg => {
     const s = seg.toLowerCase();
     if (CAMERA_JUNK_DIRS.has(s)) return false;
-    if (/^\d{3}[a-z0-9_]+$/i.test(s)) return false;
+    if (CAMERA_DCF_DIR.test(s)) return false;
     return true;
   });
 
-  const duplicates = planFiles ? planFiles.filter(f => path.basename(f.path || f) === baseName) : [];
-  if (duplicates.length > 1 && segments.length > 1) {
+  const duplicates = mediaIndex(planFiles)?.byBaseName.get(baseName) || 0;
+  if (duplicates > 1 && segments.length > 1) {
     const parentDir = segments[segments.length - 2];
     return path.join(parentDir, baseName);
   }
@@ -555,7 +589,7 @@ async function copyToTemp(source, temp, sourceStats, signal, onBytes, allowMetad
   }
 
   await preserveResourceFork(source, temp, signal);
-  await preserveMetadata(() => fsp.chmod(temp, sourceStats.mode & 0o777), 'Permessi non conservati dal disco.', signal, allowMetadataDifferences, onMetadataWarning);
+  await preserveMetadata(() => fsp.chmod(temp, sourceStats.mode & 0o7777), 'Permessi non conservati dal disco.', signal, allowMetadataDifferences, onMetadataWarning);
   await preserveMetadata(() => fsp.utimes(temp, sourceStats.atimeMs / 1000, sourceStats.mtimeMs / 1000), 'Date non conservate dal disco.', signal, allowMetadataDifferences, onMetadataWarning);
   if (process.platform === 'darwin') {
     const copiedStats = await fsp.stat(temp);
@@ -914,7 +948,7 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
           await assertDirectory(rootGuard);
           const stats = await fsp.lstat(target);
           if (!stats.isDirectory() || stats.isSymbolicLink()) throw new Error('La directory di destinazione è cambiata.');
-          await preserveMetadata(() => fsp.chmod(target, directory.stats.mode & 0o777), 'Permessi della cartella non conservati dal disco.', signal, allowMetadataDifferences, reason => warning(target, reason));
+          await preserveMetadata(() => fsp.chmod(target, directory.stats.mode & 0o7777), 'Permessi della cartella non conservati dal disco.', signal, allowMetadataDifferences, reason => warning(target, reason));
           await preserveMetadata(() => fsp.utimes(target, directory.stats.atime, directory.stats.mtime), 'Date della cartella non conservate dal disco.', signal, allowMetadataDifferences, reason => warning(target, reason));
         } catch (error) {
           cancelled(signal);
@@ -997,4 +1031,4 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
   }
 }
 
-module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, verifyHash, readResourceFork, sameResourceFork, requireCreationDate, categorizeMediaFile, resolveExistingVolumePath, detectCaseCollisions };
+module.exports = { runCopy, preparePaths, scanSources, copyFileVerified, sha256, verifyHash, readResourceFork, sameResourceFork, requireCreationDate, categorizeMediaFile, resolveDestinationRelative, resolveExistingVolumePath, detectCaseCollisions };

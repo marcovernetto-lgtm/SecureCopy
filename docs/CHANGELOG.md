@@ -1,3 +1,16 @@
+## 2.9.0 — 6 novembre 2026
+
+- **Verifica dal disco, non dalla memoria.** Dopo la copia macOS teneva i dati appena scritti in memoria, quindi il controllo SHA-256 rileggeva la RAM e non il disco. Un nuovo helper nativo svuota la cache del disco (F_FULLFSYNC), toglie il file dalla memoria di sistema, controlla con mincore() che non ne resti nulla e lo rilegge con F_NOCACHE. Report JSON e PDF DIT indicano «Verificato da disco»; se l’helper manca compare un avviso esplicito.
+- **Aggiornamenti verificati.** L’updater accetta solo i DMG delle release ufficiali di SecureCopy, ne controlla lo SHA-256 con il file SHA256SUMS della release, verifica firma, identificativo e versione dell’app prima di sostituirla e interrompe il download solo se la connessione resta ferma per 60 secondi. Corretto l’indirizzo di version.json.
+- **Report PDF sicuro.** Nomi di file, percorsi e metadati della camera sono ora sottoposti a escaping; la finestra di stampa del PDF gira in sandbox e senza JavaScript.
+- **Separazione Video/RAW/JPEG più rapida e corretta.** La pianificazione non è più quadratica (30.000 file in meno di 3 s invece di circa un minuto). Le cartelle dell’utente che iniziano con cifre, come «2024_Matrimonio» o «001_Intervista», non vengono più rimosse. I sidecar XMP vengono abbinati solo al file con lo stesso nome nella stessa cartella.
+- Conservati i bit speciali dei permessi (setuid, setgid, sticky) anche nel file temporaneo.
+- Test automatici su GitHub Actions a ogni push.
+
+## 2.8.0 — 26 ottobre 2026
+
+- Separazione automatica Video/RAW/JPEG, avviso sonoro di fine copia, espulsione automatica del disco e miniature nei report DIT.
+
 ## 2.7.7 — 16 ottobre 2026
 
 - Barra del singolo file sempre visibile: preparazione, controllo, copia, verifica, passaggio al file successivo e completamento conservano lo stesso spazio.

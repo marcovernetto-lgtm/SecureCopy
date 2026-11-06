@@ -10,9 +10,12 @@ const os = require('node:os');
 const { execFileSync, spawn } = require('node:child_process');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
+const crypto = require('node:crypto');
 
 const DEFAULT_REPO = 'marcovernetto-lgtm/SecureCopy';
-const DEFAULT_VERSION_URL = `https://raw.githubusercontent.com/${DEFAULT_REPO}/main/version.json`;
+const DEFAULT_VERSION_URL = `https://raw.githubusercontent.com/${DEFAULT_REPO}/main/src/version.json`;
+const BUNDLE_ID = 'com.unshapedstudio.securecopy';
+const IDLE_TIMEOUT_MS = 60000;
 const DEFAULT_RELEASES_URL = `https://api.github.com/repos/${DEFAULT_REPO}/releases/latest`;
 
 /**
@@ -53,6 +56,56 @@ function getDownloadUrlForArch(downloads, arch = process.arch, version = '') {
   return downloads[normArch] || downloads.universal || downloads.arm64 || downloads.x64 || Object.values(downloads)[0];
 }
 
+// Updates are accepted only from this repository's own GitHub release files,
+// whatever version.json says, so a tampered manifest cannot point elsewhere.
+function isTrustedDownloadUrl(url, repo = DEFAULT_REPO, version = '') {
+  let parsed;
+  try { parsed = new URL(url); } catch { return false; }
+  const prefix = `/${repo}/releases/download/v${String(version).replace(/^v/i, '')}/`;
+  return parsed.protocol === 'https:' && parsed.hostname === 'github.com' && !parsed.search && !parsed.hash &&
+    parsed.pathname.startsWith(prefix) && /^[A-Za-z0-9._-]+\.dmg$/.test(parsed.pathname.slice(prefix.length));
+}
+
+function checksumFor(text, filename) {
+  for (const line of String(text || '').split('\n')) {
+    const match = line.trim().match(/^([a-f0-9]{64})\s+\*?(.+)$/i);
+    if (match && match[2].trim() === filename) return match[1].toLowerCase();
+  }
+  return null;
+}
+
+async function sha256File(file) {
+  const hash = crypto.createHash('sha256');
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
+  return hash.digest('hex');
+}
+
+function plistValue(appPath, key) {
+  return execFileSync('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, path.join(appPath, 'Contents', 'Info.plist')], { encoding: 'utf8' }).trim();
+}
+
+function teamIdentifier(appPath) {
+  try {
+    const details = execFileSync('/usr/bin/codesign', ['-dv', appPath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return (details.match(/^TeamIdentifier=(.+)$/m) || [])[1] || null;
+  } catch (error) {
+    const output = String(error.stderr || '');
+    return (output.match(/^TeamIdentifier=(.+)$/m) || [])[1] || null;
+  }
+}
+
+// The new bundle must be intact, be SecureCopy, carry the announced version
+// and, once releases are Developer ID signed, come from the same team.
+function verifyAppBundle(appPath, { version, currentAppPath } = {}) {
+  execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'ignore' });
+  if (plistValue(appPath, 'CFBundleIdentifier') !== BUNDLE_ID) throw new Error('L’aggiornamento non è SecureCopy.');
+  if (version && plistValue(appPath, 'CFBundleShortVersionString') !== String(version).replace(/^v/i, '')) throw new Error('La versione dell’aggiornamento non corrisponde a quella annunciata.');
+  if (currentAppPath && fs.existsSync(currentAppPath)) {
+    const currentTeam = teamIdentifier(currentAppPath);
+    if (currentTeam && currentTeam !== 'not set' && teamIdentifier(appPath) !== currentTeam) throw new Error('L’aggiornamento è firmato da uno sviluppatore diverso.');
+  }
+}
+
 /**
  * Creates an Updater instance configured with app dependencies.
  */
@@ -65,7 +118,7 @@ function createUpdater(options = {}) {
     try {
       return appRef?.getVersion() || require('./package.json').version;
     } catch {
-      return '2.8.0';
+      return '2.9.0';
     }
   });
   const getLanguage = options.getLanguage || (() => 'it');
@@ -154,13 +207,16 @@ function createUpdater(options = {}) {
         const lang = getLanguage();
         const notes = remoteInfo.notes?.[lang] || remoteInfo.notes?.it || remoteInfo.notes?.en || 'Nuova versione disponibile.';
         const downloadUrl = getDownloadUrlForArch(remoteInfo.downloads, process.arch, remoteInfo.version);
+        const arch = process.arch === 'x64' ? 'x64' : 'arm64';
+        const sha256 = typeof remoteInfo.sha256 === 'object' ? remoteInfo.sha256?.[arch] : null;
 
         pendingUpdate = {
           version: remoteInfo.version,
           build: remoteInfo.build || 1,
           releaseDate: remoteInfo.releaseDate,
           notes,
-          downloadUrl
+          downloadUrl,
+          sha256: /^[a-f0-9]{64}$/i.test(sha256 || '') ? sha256.toLowerCase() : null
         };
 
         setStatus({
@@ -210,6 +266,10 @@ function createUpdater(options = {}) {
       throw new Error('Aggiornamento automatico disponibile esclusivamente su macOS.');
     }
 
+    if (!isTrustedDownloadUrl(updateInfo.downloadUrl, repo, updateInfo.version)) {
+      throw new Error('Indirizzo di aggiornamento non attendibile: sono ammessi solo i file delle release ufficiali di SecureCopy.');
+    }
+
     isDownloading = true;
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'securecopy-update-'));
     const targetDMG = path.join(tempDir, 'SecureCopy-Update.dmg');
@@ -223,10 +283,25 @@ function createUpdater(options = {}) {
         progress: 0
       });
 
-      // Stream download with progress tracking
+      // The expected checksum comes from the release's SHA256SUMS file
+      // (or version.json); without one the update is not installed.
+      const dmgName = path.basename(new URL(updateInfo.downloadUrl).pathname);
+      let expectedHash = updateInfo.sha256 || null;
+      if (!expectedHash) {
+        const sumsUrl = new URL(`SHA256SUMS-${String(updateInfo.version).replace(/^v/i, '')}.txt`, updateInfo.downloadUrl).href;
+        const sums = await fetch(sumsUrl, { headers: { 'User-Agent': 'SecureCopy-Updater' }, signal: AbortSignal.timeout(30000) });
+        if (sums.ok) expectedHash = checksumFor(await sums.text(), dmgName);
+      }
+      if (!expectedHash) throw new Error('Checksum dell’aggiornamento non disponibile: installazione annullata.');
+
+      // Stream download with progress tracking; abort only when the
+      // connection stalls, so slow networks can still finish.
+      const idle = new AbortController();
+      let idleTimer = setTimeout(() => idle.abort(new Error('Download bloccato: nessun dato ricevuto per 60 secondi.')), IDLE_TIMEOUT_MS);
+      const touch = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => idle.abort(new Error('Download bloccato: nessun dato ricevuto per 60 secondi.')), IDLE_TIMEOUT_MS); };
       const response = await fetch(updateInfo.downloadUrl, {
         headers: { 'User-Agent': 'SecureCopy-Updater' },
-        signal: AbortSignal.timeout(180000)
+        signal: idle.signal
       });
 
       if (!response.ok) {
@@ -239,6 +314,7 @@ function createUpdater(options = {}) {
 
       const webStream = Readable.fromWeb(response.body);
       webStream.on('data', chunk => {
+        touch();
         receivedBytes += chunk.length;
         const now = Date.now();
         if (now - lastReport > 200 || (totalBytes && receivedBytes === totalBytes)) {
@@ -254,12 +330,11 @@ function createUpdater(options = {}) {
         }
       });
 
-      await pipeline(webStream, fs.createWriteStream(targetDMG));
+      try { await pipeline(webStream, fs.createWriteStream(targetDMG)); }
+      finally { clearTimeout(idleTimer); }
 
-      // Verify DMG exists
-      const dmgStats = await fs.promises.stat(targetDMG);
-      if (dmgStats.size < 100000) {
-        throw new Error('File di aggiornamento incompleto o corrotto.');
+      if (await sha256File(targetDMG) !== expectedHash) {
+        throw new Error('Checksum dell’aggiornamento non valido: file scartato.');
       }
 
       setStatus({
@@ -289,6 +364,8 @@ function createUpdater(options = {}) {
           destAppPath = execMatch[1];
         }
       }
+
+      verifyAppBundle(newAppPath, { version: updateInfo.version, currentAppPath: destAppPath });
 
       // Safe atomic replacement with rollback backup
       const backupPath = path.join(tempDir, 'SecureCopy_Backup.app');
@@ -347,13 +424,10 @@ function createUpdater(options = {}) {
     const targetPath = readyAppPath;
 
     // Shell script to wait for current process exit, clear quarantine and open new app
-    const script = `
-      while kill -0 ${pid} 2>/dev/null; do sleep 0.1; done
-      /usr/bin/xattr -cr "${targetPath}" 2>/dev/null
-      /usr/bin/open "${targetPath}"
-    `;
+    // Values are passed as arguments, never interpolated into the script.
+    const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.1; done; /usr/bin/xattr -cr "$2" 2>/dev/null; /usr/bin/open "$2"';
 
-    const child = spawn('/bin/sh', ['-c', script], {
+    const child = spawn('/bin/sh', ['-c', script, 'securecopy-relaunch', String(pid), targetPath], {
       detached: true,
       stdio: 'ignore'
     });
@@ -378,5 +452,8 @@ function createUpdater(options = {}) {
 module.exports = {
   compareVersions,
   getDownloadUrlForArch,
+  isTrustedDownloadUrl,
+  checksumFor,
+  verifyAppBundle,
   createUpdater
 };

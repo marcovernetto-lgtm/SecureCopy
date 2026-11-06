@@ -1,13 +1,17 @@
 {
-  "version": "2.8.0",
+  "version": "2.9.0",
   "build": 1,
-  "releaseDate": "2026-10-26",
+  "releaseDate": "2026-11-06",
   "notes": {
-    "it": "Separazione automatica Video/RAW/JPEG, avviso sonoro di completamento, espulsione automatica disco e miniature nei report DIT.",
-    "en": "Automatic Video/RAW/JPEG separation, audio completion alert, auto-eject external disk, and thumbnail previews in DIT reports."
+    "it": "Verifica della copia letta dal disco e non dalla memoria, aggiornamenti verificati con checksum, report PDF più sicuro e separazione Video/RAW/JPEG più veloce e corretta.",
+    "en": "Copies are verified from the disk instead of memory, updates are checksum-verified, safer PDF reports and faster, more accurate Video/RAW/JPEG separation."
   },
   "downloads": {
-    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.8.0/SecureCopy-2.8.0-arm64.dmg",
-    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.8.0/SecureCopy-2.8.0-x64.dmg"
+    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.9.0/SecureCopy-2.9.0-arm64.dmg",
+    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.9.0/SecureCopy-2.9.0-x64.dmg"
+  },
+  "sha256": {
+    "arm64": "17de186890322b45dfc51e34d82bae3033f03e21142134419d9ef76e0263b9cd",
+    "x64": "b0294e411cf2c05ad9fea71a9c6e2acf75ba3c3e5c6143969c3e36a0ff44e24c"
   }
 }

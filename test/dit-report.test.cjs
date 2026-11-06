@@ -203,3 +203,23 @@ test('resolveUniqueReportPdfPath names reports and increments _A _B _C when file
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
 });
+
+test('DIT report escapes file names and camera metadata and states disk verification', () => {
+  const hostile = '<img src=x onerror=alert(1)>.MOV';
+  const html = generateDITReportHTML({
+    id: 'r1', sourceDirs: ['/Volumes/<b>CARD</b>'], destination: '/dest',
+    files: [{ path: `A/${hostile}`, bytes: 10, sha256: 'a'.repeat(64), physicalVerification: true }]
+  }, [{ camera: '<script>x()</script>', thumbnail: 'javascript:alert(1)' }]);
+  assert.ok(!html.includes('<img src=x'));
+  assert.ok(!html.includes('<script>x()'));
+  assert.ok(!html.includes('<b>CARD</b>'));
+  assert.ok(!html.includes('javascript:alert'));
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;.MOV'));
+  assert.ok(html.includes('100% VERIFICATO DA DISCO'));
+  assert.ok(html.includes('Verificato da disco'));
+
+  const mixed = generateDITReportHTML({ files: [{ path: 'a.MOV', bytes: 1, physicalVerification: false }, { path: 'b.MOV', bytes: 1, physicalVerification: true }] }, []);
+  assert.ok(mixed.includes('VERIFICATO · 1 DA CACHE'));
+  const legacy = generateDITReportHTML({ files: [{ path: 'a.MOV', bytes: 1 }] }, []);
+  assert.ok(legacy.includes('✓ 100% VERIFICATO<'));
+});

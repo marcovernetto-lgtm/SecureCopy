@@ -91,3 +91,29 @@ test('createUpdater handles fetch failure gracefully without throwing in silent 
   assert.equal(nonSilentResult.status, 'error');
   assert.ok(nonSilentResult.message);
 });
+
+test('only official release DMG URLs are trusted for installation', () => {
+  const { isTrustedDownloadUrl } = require('../src/updater');
+  const base = 'https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.9.0/';
+  assert.equal(isTrustedDownloadUrl(`${base}SecureCopy-2.9.0-arm64.dmg`, undefined, '2.9.0'), true);
+  assert.equal(isTrustedDownloadUrl(`${base}SecureCopy-2.9.0-arm64.dmg`, undefined, '2.9.1'), false);
+  assert.equal(isTrustedDownloadUrl('http://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.9.0/x.dmg', undefined, '2.9.0'), false);
+  assert.equal(isTrustedDownloadUrl('https://evil.example/marcovernetto-lgtm/SecureCopy/releases/download/v2.9.0/x.dmg', undefined, '2.9.0'), false);
+  assert.equal(isTrustedDownloadUrl('https://github.com/someone/else/releases/download/v2.9.0/x.dmg', undefined, '2.9.0'), false);
+  assert.equal(isTrustedDownloadUrl(`${base}../../v1/x.dmg`, undefined, '2.9.0'), false);
+  assert.equal(isTrustedDownloadUrl(`${base}SecureCopy.zip`, undefined, '2.9.0'), false);
+});
+
+test('checksums are read from SHA256SUMS for the exact file name', () => {
+  const { checksumFor } = require('../src/updater');
+  const a = 'a'.repeat(64), b = 'B'.repeat(64);
+  const text = `${a}  SecureCopy-2.9.0-arm64.dmg\n${b} *SecureCopy-2.9.0-x64.dmg\n`;
+  assert.equal(checksumFor(text, 'SecureCopy-2.9.0-arm64.dmg'), a);
+  assert.equal(checksumFor(text, 'SecureCopy-2.9.0-x64.dmg'), b.toLowerCase());
+  assert.equal(checksumFor(text, 'SecureCopy-2.9.0-arm64.zip'), null);
+});
+
+test('untrusted update URLs are refused before anything is downloaded', async () => {
+  const updater = createUpdater({ getCurrentVersion: () => '2.8.0' });
+  await assert.rejects(updater.downloadAndInstallUpdate({ version: '2.9.0', downloadUrl: 'https://example.com/SecureCopy-2.9.0-arm64.dmg' }), /non attendibile/);
+});

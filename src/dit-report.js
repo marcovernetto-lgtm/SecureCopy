@@ -96,6 +96,11 @@ async function extractPhotoThumbnail(filePath) {
   }
 }
 
+// File names and camera metadata come from the card: never trust them as HTML.
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
   if (bytes === 0) return '0 B';
@@ -342,7 +347,7 @@ function renderDITCard(file, meta) {
   const fileSizeStr = formatBytes(file.bytes || 0);
   const createdStr = formatTimestamp(file.createdAt);
   const dirName = path.dirname(file.path || '');
-  const showRelPath = dirName && dirName !== '.' ? `<span class="card-path" title="${file.path}">${file.path}</span>` : '';
+  const showRelPath = dirName && dirName !== '.' ? `<span class="card-path" title="${esc(file.path)}">${esc(file.path)}</span>` : '';
 
   return `
     <div class="file-manifest-card">
@@ -350,7 +355,7 @@ function renderDITCard(file, meta) {
       <div class="card-thumb-col">
         ${meta.thumbnail ? `
           <div class="file-thumb-wrap">
-            <img src="${meta.thumbnail}" class="file-thumb-img" alt="Preview" />
+            <img src="${/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(meta.thumbnail) ? meta.thumbnail : ''}" class="file-thumb-img" alt="Preview" />
           </div>` : `
           <div class="file-thumb-wrap file-thumb-empty">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3d5a66" stroke-width="1.5">
@@ -368,7 +373,7 @@ function renderDITCard(file, meta) {
         <div class="card-header-line">
           <div class="card-title-group">
             <span class="v-mark">✓</span>
-            <strong class="file-name" title="${path.basename(file.path || '')}">${path.basename(file.path || '')}</strong>
+            <strong class="file-name" title="${esc(path.basename(file.path || ''))}">${esc(path.basename(file.path || ''))}</strong>
             ${showRelPath}
           </div>
           <div class="card-size-badge">${fileSizeStr}</div>
@@ -378,36 +383,36 @@ function renderDITCard(file, meta) {
         <div class="specs-grid">
           <div class="spec-cell">
             <span class="spec-k">Risoluzione</span>
-            <span class="spec-v">${meta.resolution || '—'}</span>
+            <span class="spec-v">${esc(meta.resolution || '—')}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Frame Rate</span>
-            <span class="spec-v">${meta.fps || '—'}</span>
+            <span class="spec-v">${esc(meta.fps || '—')}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Durata</span>
-            <span class="spec-v">${meta.duration || '—'}</span>
+            <span class="spec-v">${esc(meta.duration || '—')}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Codec</span>
-            <span class="spec-v spec-codec">${meta.codec || '—'}</span>
+            <span class="spec-v spec-codec">${esc(meta.codec || '—')}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Timecode</span>
-            <span class="spec-v spec-mono">${meta.timecode || '—'}</span>
+            <span class="spec-v spec-mono">${esc(meta.timecode || '—')}</span>
           </div>
 
           <div class="spec-cell">
             <span class="spec-k">Camera</span>
-            <span class="spec-v">${meta.camera || '—'}</span>
+            <span class="spec-v">${esc(meta.camera || '—')}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Obiettivo</span>
-            <span class="spec-v">${meta.lens || '—'}</span>
+            <span class="spec-v">${esc(meta.lens || '—')}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Audio</span>
-            <span class="spec-v">${meta.audio || '—'}</span>
+            <span class="spec-v">${esc(meta.audio || '—')}</span>
           </div>
           <div class="spec-cell">
             <span class="spec-k">Data</span>
@@ -415,7 +420,7 @@ function renderDITCard(file, meta) {
           </div>
           <div class="spec-cell">
             <span class="spec-k">Integrità</span>
-            <span class="spec-v spec-verified">✓ Verificato</span>
+            <span class="spec-v spec-verified">${file.physicalVerification === true ? '✓ Verificato da disco' : '✓ Verificato'}</span>
           </div>
         </div>
       </div>
@@ -445,6 +450,11 @@ function generateDITReportHTML(reportData, probedFiles) {
   const totalFiles = targetIndices.length;
   const totalBytes = targetIndices.reduce((acc, idx) => acc + (allFiles[idx].bytes || 0), 0);
   const totalVolumeStr = formatBytes(totalBytes);
+  // Reports from older versions carry no physicalVerification field.
+  const physicalKnown = targetIndices.some(idx => typeof allFiles[idx].physicalVerification === 'boolean');
+  const cachedCount = targetIndices.filter(idx => allFiles[idx].physicalVerification !== true).length;
+  const integrityStr = !physicalKnown ? '✓ 100% VERIFICATO'
+    : cachedCount === 0 ? '✓ 100% VERIFICATO DA DISCO' : `✓ VERIFICATO · ${cachedCount} DA CACHE`;
   const sourcePath = (reportData.sourceDirs || []).join(', ') || '—';
   const destinationPath = reportData.destination || '—';
 
@@ -488,18 +498,18 @@ function generateDITReportHTML(reportData, probedFiles) {
             </div>
             <div class="stat-box">
               <span class="stat-label">Stato Integrità</span>
-              <div class="stat-val accent">✓ 100% VERIFICATO</div>
+              <div class="stat-val accent">${integrityStr}</div>
             </div>
           </div>
 
           <div class="paths-row">
             <div class="path-block">
               <span class="path-title">Sorgente</span>
-              <span class="path-str" title="${sourcePath}">${sourcePath}</span>
+              <span class="path-str" title="${esc(sourcePath)}">${esc(sourcePath)}</span>
             </div>
             <div class="path-block">
               <span class="path-title">Destinazione</span>
-              <span class="path-str" title="${destinationPath}">${destinationPath}</span>
+              <span class="path-str" title="${esc(destinationPath)}">${esc(destinationPath)}</span>
             </div>
           </div>
         </header>
@@ -544,7 +554,7 @@ function generateDITReportHTML(reportData, probedFiles) {
             PAGINA ${pageIdx + 1} DI ${totalPages}
           </div>
           <div class="footer-right">
-            VERIFICATION ID: ${reportData.id || '—'}
+            VERIFICATION ID: ${esc(reportData.id || '—')}
           </div>
         </footer>
       </div>
@@ -1026,7 +1036,10 @@ async function exportDITReportPDF(reportData, BrowserWindow, shell, reportsDirec
     width: 1200,
     height: 900,
     webPreferences: {
-      sandbox: false
+      sandbox: true,
+      javascript: false,
+      contextIsolation: true,
+      nodeIntegration: false
     }
   });
 

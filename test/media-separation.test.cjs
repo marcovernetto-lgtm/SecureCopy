@@ -97,3 +97,35 @@ test('runCopy with mediaSeparation: false preserves original hierarchy', async (
   const expectedDest = path.join(destination, 'CAMERA_CARD', 'DCIM', '100CANON', 'IMG_0001.CR3');
   assert.equal(await fs.readFile(expectedDest, 'utf8'), 'raw content');
 });
+
+test('media separation keeps user folders that start with digits and drops DCF camera folders', async () => {
+  const { resolveDestinationRelative } = require('../src/copy-engine');
+  const source = { name: 'CARD', root: '/card' };
+  const item = relative => ({ source, path: path.join('/card', relative), relative });
+  const files = [item('2024_Matrimonio/IMG_1.JPG'), item('001_Intervista/A.MOV'), item('DCIM/100CANON/IMG_2.CR3')];
+  assert.equal(resolveDestinationRelative(files[0], files, true), path.join('CARD', 'Foto JPEG', '2024_Matrimonio', 'IMG_1.JPG'));
+  assert.equal(resolveDestinationRelative(files[1], files, true), path.join('CARD', 'Video', '001_Intervista', 'A.MOV'));
+  assert.equal(resolveDestinationRelative(files[2], files, true), path.join('CARD', 'Foto RAW', 'IMG_2.CR3'));
+});
+
+test('XMP sidecars match only their own media file', () => {
+  const files = [{ path: '/card/C0001.xmp' }, { path: '/card/C00010.MP4' }, { path: '/card/X.CR3.xmp' }, { path: '/card/X.CR3' },
+    { path: '/card/P1.JPG' }, { path: '/card/P1.xmp' }, { path: '/other/C0001.MP4' }];
+  assert.equal(categorizeMediaFile('/card/C0001.xmp', files), 'Foto RAW', 'no prefix match with C00010.MP4, no cross-folder match');
+  assert.equal(categorizeMediaFile('/card/X.CR3.xmp', files), 'Foto RAW');
+  assert.equal(categorizeMediaFile('/card/P1.xmp', files), 'Foto JPEG');
+});
+
+test('media destination planning stays linear on large cards', () => {
+  const { resolveDestinationRelative, detectCaseCollisions } = require('../src/copy-engine');
+  const source = { name: 'CARD', root: '/card' };
+  const files = [];
+  for (let i = 0; i < 30000; i++) {
+    const relative = path.join('DCIM', `${100 + (i % 9)}CANON`, `IMG_${i}.${i % 3 ? 'CR3' : 'XMP'}`);
+    files.push({ source, path: path.join('/card', relative), relative });
+  }
+  const started = Date.now();
+  const collisions = detectCaseCollisions(files, true);
+  for (const file of files) resolveDestinationRelative(file, files, true, collisions);
+  assert.ok(Date.now() - started < 3000, `planning took ${Date.now() - started} ms`);
+});

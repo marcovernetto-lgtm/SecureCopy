@@ -1,17 +1,17 @@
 {
-  "version": "2.10.3",
+  "version": "2.10.4",
   "build": 1,
   "releaseDate": "2026-11-06",
   "notes": {
-    "it": "Elenco dei file in Operazioni come riquadro con intestazione sempre visibile: nessun file appare più tagliato.",
-    "en": "Operations file list framed with an always-visible header: no file appears cut off anymore."
+    "it": "Tempo rimanente subito visibile anche alla ripresa di copie grandi; fasi più chiare: Lettura originale e Confronto.",
+    "en": "Time remaining shows right away, even when resuming large copies; clearer phases: Reading original and Comparing."
   },
   "downloads": {
-    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.3/SecureCopy-2.10.3-arm64.dmg",
-    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.3/SecureCopy-2.10.3-x64.dmg"
+    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.4/SecureCopy-2.10.4-arm64.dmg",
+    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.4/SecureCopy-2.10.4-x64.dmg"
   },
   "sha256": {
-    "arm64": "638201dac2c03bb4f6d32dab5e477785cad87eb13ca052fbd64825fd4fd56990",
-    "x64": "e38a4955a8b2d2b009a8932358dc8efd5c68fce141c7d585157d7414b583da3c"
+    "arm64": "928f74b26df6284e43263abc23200b7a1fc1c9c797f1c10131c8b437d4f28b66",
+    "x64": "c273ce0bbe33cc528e07cf61a4ce6d67bc22a19d8824f36f3e8a7e2796aff6b2"
   }
 }

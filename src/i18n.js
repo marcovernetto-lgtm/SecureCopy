@@ -143,6 +143,9 @@
     'Verificato': 'Verified',
     'Copiato': 'Copied',
     'Coda': 'Queue',
+    'Lettura originale': 'Reading original',
+    'Lettura': 'Reading',
+    'Confronto': 'Comparing',
     'Riprendi la copia': 'Resume copy',
     'Saltato': 'Skipped',
     'Non copiato': 'Not copied',
@@ -357,7 +360,7 @@
     if ((match = value.match(/^(\d+) (elemento|elementi) da controllare$/))) return `${match[1]} ${match[1] === '1' ? 'item' : 'items'} to review`;
     if ((match = value.match(/^Espelli (.+)$/))) return `Eject ${match[1]}`;
     if ((match = value.match(/^(.+) espulso$/))) return `${match[1]} ejected`;
-    if ((match = value.match(/^(Copia|Controllo|Verifica) (\d+)%$/))) return `${({ Copia: 'Copy', Controllo: 'Checking', Verifica: 'Verifying' })[match[1]]} ${match[2]}%`;
+    if ((match = value.match(/^(Copia|Controllo|Verifica|Lettura|Confronto) (\d+)%$/))) return `${({ Copia: 'Copy', Controllo: 'Checking', Verifica: 'Verifying', Lettura: 'Reading', Confronto: 'Comparing' })[match[1]]} ${match[2]}%`;
     if ((match = value.match(/^(\d+) file trovati$/))) return `${match[1]} files found`;
     if ((match = value.match(/^Verifica fisica non garantita per (\d+) file: .*$/)))
       return `Physical verification not guaranteed for ${match[1]} files: the content was re-read, but the system may have served it from memory instead of the disk.`;

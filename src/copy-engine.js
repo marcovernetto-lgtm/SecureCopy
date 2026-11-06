@@ -884,6 +884,8 @@ async function runCopy({ sourceDirs, destDir, signal, waitIfPaused, onLog, onPro
         const completedFraction = report.totalBytes ? (report.bytesProcessed + item.stats.size * fraction) / report.totalBytes : (report.filesProcessed + fraction) / Math.max(1, report.totalFiles);
         onProgress?.({ phase, currentFile: relative, filesProcessed: report.filesProcessed, totalFiles: report.totalFiles,
           bytesProcessed: report.bytesProcessed, totalBytes: report.totalBytes,
+          // Bytes of work done including the file in progress, for a rate-based time estimate.
+          doneBytes: report.bytesProcessed + item.stats.size * fraction,
           percentage: Math.min(99, Math.floor(completedFraction * 99)),
           transferredBytes: report.transferredBytes + currentTransferred, ...extra });
       };

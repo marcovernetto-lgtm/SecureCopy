@@ -2829,6 +2829,12 @@ function opEl(tag, className, text) {
     return el;
 }
 
+// compare = the original is read for its fingerprint; when a copy already
+// exists at the destination it is read too and the two are compared.
+function opPhaseLabel(p, short = false) {
+    if (p.phase === 'compare') return p.readPass === 'destination' ? 'Confronto' : short ? 'Lettura' : 'Lettura originale';
+    return { scan: 'Preparazione', copy: 'Copia', verify: short ? 'Verifica' : 'Verifica da disco' }[p.phase] || 'In corso';
+}
 function opJobView(job) {
     const p = latestProgress.get(job.id) || {};
     if (opFinished(job)) {
@@ -2845,21 +2851,40 @@ function opJobView(job) {
     if (job.status === 'pending') return { state: 'waiting', label: 'In attesa', right: '', pct: 0, rate: '', sub: '' };
     const pct = Math.max(0, Math.min(99, p.percentage ?? job.progress ?? 0));
     const paused = job.status === 'paused' || job.status === 'pausing' || job.paused;
-    const label = paused ? 'In pausa' : ({ scan: 'Preparazione', compare: 'Controllo', copy: 'Copia', verify: 'Verifica da disco' }[p.phase] || 'In corso');
+    const label = paused ? 'In pausa' : opPhaseLabel(p);
     return { state: 'running', label, right: `${pct}%`, pct,
         rate: p.averageSpeedBytesPerSec ? `${opSize(p.averageSpeedBytesPerSec)}/s` : '',
         sub: p.totalBytes ? `${opSize(p.bytesProcessed || 0)} / ${opSize(p.totalBytes)}` : '' };
 }
 
+// Time remaining from the recent work rate (last 90 s), not from the start:
+// a resumed copy first re-checks files already copied, which would distort
+// an average since the beginning and hide the estimate for minutes.
+const opRateSamples = new Map(); // jobId -> [{ t, bytes }]
+function opSampleRate(data) {
+    const bytes = data.doneBytes ?? data.bytesProcessed;
+    if (!Number.isFinite(bytes) || !data.totalBytes) return;
+    const now = Date.now();
+    const samples = opRateSamples.get(data.id) || [];
+    const last = samples.at(-1);
+    if (last && bytes < last.bytes) samples.length = 0;           // restarted
+    if (!last || now - last.t >= 1000 || bytes < last.bytes) samples.push({ t: now, bytes });
+    while (samples.length > 2 && now - samples[0].t > 90000) samples.shift();
+    opRateSamples.set(data.id, samples);
+}
 function opEtaMs(jobs) {
     let worst = 0;
     for (const job of jobs) {
-        if (opFinished(job)) continue;
+        if (opFinished(job) || job.status === 'pending') continue;
         if (job.status !== 'processing' || job.paused) return null;
-        const pct = latestProgress.get(job.id)?.percentage ?? job.progress ?? 0;
-        if (!job.startedAt || pct < 2) return null;
-        const elapsed = Date.now() - Date.parse(job.startedAt);
-        worst = Math.max(worst, elapsed * (100 - pct) / pct);
+        const p = latestProgress.get(job.id);
+        const samples = opRateSamples.get(job.id) || [];
+        if (!p?.totalBytes || samples.length < 2) return null;
+        const first = samples[0], last = samples.at(-1);
+        const seconds = (last.t - first.t) / 1000;
+        if (seconds < 4 || last.bytes <= first.bytes) return null;
+        const rate = (last.bytes - first.bytes) / seconds;
+        worst = Math.max(worst, (p.totalBytes - last.bytes) / rate * 1000);
     }
     return worst || null;
 }
@@ -2912,7 +2937,7 @@ function opCell(job, file, outcome) {
         const reading = p.phase !== 'copy' && p.readTotal > 0;
         const total = reading ? p.readTotal : p.currentFileTotal || 0;
         const done = reading ? p.readBytes || 0 : p.currentFileBytes || 0;
-        const label = { compare: 'Controllo', copy: 'Copia', verify: 'Verifica' }[p.phase] || 'In corso';
+        const label = opPhaseLabel(p, true);
         const span = opEl('span', 'op-st run');
         span.append(opIcon('dot'), document.createTextNode(total ? `${label} ${Math.min(100, Math.round(done / total * 100))}%` : label));
         return span;
@@ -3089,6 +3114,7 @@ if (window.electronAPI) {
     window.electronAPI.onCopyProgress((data) => {
         if (!data?.id) return;
         if (data.averageSpeedBytesPerSec) opLastSpeed.set(data.id, data.averageSpeedBytesPerSec);
+        opSampleRate(data);
         const job = operations.find(item => item.id === data.id);
         const focused = operations.find(item => item.id === focusedJobId);
         if (!job || !focused || opBatch(job) !== opBatch(focused)) return;

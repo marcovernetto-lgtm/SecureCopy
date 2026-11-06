@@ -1,3 +1,8 @@
+## 2.10.4 — 6 novembre 2026
+
+- Tempo rimanente calcolato dalla velocità degli ultimi 90 secondi: compare dopo pochi secondi anche quando si riprende una copia grande, invece di attendere il 2% dell'avanzamento.
+- Fasi più chiare: «Lettura originale» (impronta della sorgente prima della copia) e «Confronto» (file già presente sulla destinazione) al posto di «Controllo».
+
 ## 2.10.3 — 6 novembre 2026
 
 - Elenco dei file in Operazioni come riquadro: linea sotto «File», intestazione (Nome, Dimensione, dischi) sempre visibile, area di scorrimento alta un numero intero di righe che si aggancia alle righe, così nessun file appare tagliato.

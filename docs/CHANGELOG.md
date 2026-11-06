@@ -1,3 +1,10 @@
+## 2.10.1 — 6 novembre 2026
+
+- Elenco dei file: solo il nome del file (il percorso completo resta nel suggerimento); i file già presenti e identici risultano «Copiato».
+- «Interrompi» in arancione, grande quanto «Pausa».
+- La coda si chiama «Coda», è una lista leggera ed elenca solo le copie in attesa, non quella già mostrata in alto.
+- Corretto: con una copia in coda il pulsante «Pausa» poteva sparire.
+
 ## 2.10.0 — 6 novembre 2026
 
 - **Nuova schermata Operazioni.** Le copie avviate insieme sono un'unica operazione: in alto cosa copi, dove e quanto manca; una riga per ogni disco con fase (copia o verifica da disco), velocità e GB scritti; l'elenco dei file con lo stato su ciascun disco, aggiornato file per file.

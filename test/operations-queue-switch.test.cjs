@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const rendererCode = fs.readFileSync(require.resolve('../src/renderer.js'), 'utf8');
 
-test('clicking between operations updates focusedJobId and does not wipe DOM during progress updates', () => {
+test('queue lists only waiting copies; clicking one focuses it without wiping the DOM', () => {
   const elements = new Map();
   function makeElement(tag = 'div') {
     let classes = new Set();
@@ -80,8 +80,10 @@ test('clicking between operations updates focusedJobId and does not wipe DOM dur
     },
     queueItems: queueItemsEl,
     operations: [
-      { id: 'job-1', description: 'Copia A', status: 'processing', progress: 10, filesProcessed: 1, totalFiles: 10 },
-      { id: 'job-2', description: 'Copia B', status: 'processing', progress: 5, filesProcessed: 0, totalFiles: 10 }
+      { id: 'job-1', batchId: 'a', description: 'Copia A', status: 'processing', progress: 10, filesProcessed: 1, totalFiles: 10 },
+      { id: 'job-1b', batchId: 'a', description: 'Copia A bis', status: 'pending', progress: 0, filesProcessed: 0, totalFiles: 0 },
+      { id: 'job-2', batchId: 'b', description: 'Copia B', status: 'pending', progress: 0, filesProcessed: 0, totalFiles: 10 },
+      { id: 'job-3', batchId: 'c', description: 'Copia C', status: 'pending', progress: 0, filesProcessed: 0, totalFiles: 10 }
     ],
     copyQueue: [],
     latestProgress: new Map(),
@@ -96,10 +98,11 @@ test('clicking between operations updates focusedJobId and does not wipe DOM dur
   };
 
   vm.createContext(context);
+  context.copyQueue = context.operations;
   vm.runInContext('var focusedJobId = "job-1";', context);
 
   // Extract functions
-  for (const fnName of ['updateQueueSelectionUI', 'updateQueueItemState', 'renderQueueItems']) {
+  for (const fnName of ['updateQueueSelectionUI', 'updateQueueItemState', 'queuedElsewhere', 'renderQueueItems']) {
     const start = rendererCode.indexOf(`function ${fnName}(`);
     assert.ok(start >= 0, `Function ${fnName} should be in renderer.js`);
     const end = rendererCode.indexOf('\nfunction ', start + 1);
@@ -107,31 +110,23 @@ test('clicking between operations updates focusedJobId and does not wipe DOM dur
     vm.runInContext(rendererCode.slice(start, end), context);
   }
 
-  // Initial render
+  // Only waiting copies outside the operation on screen (batch a) are listed.
   context.renderQueueItems();
   assert.equal(queueItemsEl.children.length, 2);
+  const button2 = queueItemsEl.children[0].children[0];
+  const button3 = queueItemsEl.children[1].children[0];
+  assert.equal(button2.dataset.id, 'job-2');
+  assert.equal(button3.dataset.id, 'job-3');
 
-  const initialButton1 = queueItemsEl.children[0].children[0];
-  const initialButton2 = queueItemsEl.children[1].children[0];
+  // A state update must not recreate the buttons.
+  context.updateQueueItemState(context.operations[3]);
+  assert.equal(queueItemsEl.children[0].children[0], button2);
+  assert.equal(queueItemsEl.children[1].children[0], button3);
+  assert.equal(button3.children[1].textContent, 'In attesa');
 
-  assert.equal(initialButton1.classList.contains('selected'), true);
-  assert.equal(initialButton2.classList.contains('selected'), false);
-
-  // Simulate progress update on job-2: MUST NOT recreate buttons
-  context.operations[1].progress = 50;
-  context.updateQueueItemState(context.operations[1]);
-
-  // Check buttons are strictly the SAME objects in memory (not replaced/destroyed)
-  assert.equal(queueItemsEl.children[0].children[0], initialButton1);
-  assert.equal(queueItemsEl.children[1].children[0], initialButton2);
-
-  // Check badge text updated
-  const badge2 = queueItemsEl.children[1].children[0].children[1];
-  assert.equal(badge2.textContent, 'In corso 50%');
-
-  // Simulate clicking job-2
-  initialButton2.dispatchEvent({ type: 'click' });
+  // Clicking a waiting copy focuses it.
+  button2.dispatchEvent({ type: 'click' });
   assert.equal(vm.runInContext('focusedJobId', context), 'job-2');
-  assert.equal(initialButton1.classList.contains('selected'), false);
-  assert.equal(initialButton2.classList.contains('selected'), true);
+  assert.equal(button2.classList.contains('selected'), true);
+  assert.equal(button3.classList.contains('selected'), false);
 });

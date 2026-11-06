@@ -306,6 +306,8 @@ function renderSelectedOperation(item) {
         if (item.result) displayResult(item.result, item.id);
     }
     renderOperationGroup(item);
+    renderQueueItems();
+    queueContainer?.classList.toggle('hidden', queuedElsewhere().length === 0);
 }
 
 // IPC Listeners
@@ -675,7 +677,7 @@ function updateQueueDisplay() {
     const pending = copyQueue.filter(item => item.status === 'pending');
     if (queueCountBadge) queueCountBadge.textContent = pending.length;
     queuePreviewSection?.classList.toggle('hidden', pending.length === 0);
-    queueContainer?.classList.toggle('hidden', operations.length === 0);
+    queueContainer?.classList.toggle('hidden', queuedElsewhere().length === 0);
     monitorLogPanel?.classList.toggle('expanded', operations.length === 0);
     if (queuePreviewList) {
         queuePreviewList.replaceChildren();
@@ -718,11 +720,17 @@ function updateQueueItemState(item) {
     if (badge.dataset.status !== statusAttr) badge.dataset.status = statusAttr;
 }
 
+// The queue lists only copies still waiting, never the operation already on screen.
+function queuedElsewhere() {
+    const focused = operations.find(item => item.id === focusedJobId);
+    const batch = focused?.batchId || focused?.id;
+    return copyQueue.filter(item => item.status === 'pending' && (item.batchId || item.id) !== batch);
+}
 function renderQueueItems() {
     if (!queueItems) return;
     queueItems.replaceChildren();
     const pending = copyQueue.filter(item => item.status === 'pending');
-    operations.forEach((item, index) => {
+    queuedElsewhere().forEach((item, index) => {
         const row = document.createElement('div');
         row.className = 'queue-item';
         row.dataset.id = item.id;
@@ -780,10 +788,10 @@ function updateQueueControls() {
     const active = copyQueue.filter(item => ['processing', 'pausing', 'paused'].includes(item.status));
     const selected = operations.find(item => item.id === focusedJobId && ['processing','pausing','paused'].includes(item.status));
     clearQueueBtn?.classList.toggle('hidden', pending.length === 0);
-    clearCompletedBtn?.classList.toggle('hidden', !operations.some(item =>
-        ['completed', 'partial', 'failed', 'cancelled'].includes(item.status)));
+    clearCompletedBtn?.classList.add('hidden');
     if (copyStatusContainer) copyStatusContainer.classList.toggle('hidden', !selected);
-    pauseQueueBtn?.classList.toggle('hidden', !selected || selected.status !== 'processing' || selected.paused);
+    // Always a boolean: toggle(name, undefined) would flip the button on every update.
+    pauseQueueBtn?.classList.toggle('hidden', !selected || selected.status !== 'processing' || Boolean(selected.paused));
     resumeQueueBtn?.classList.toggle('hidden', !selected || selected.status === 'processing' && !selected.paused);
     const activeTotal = operations.filter(item => ['processing', 'pausing', 'paused'].includes(item.status)).length;
     if (activeCopyCount) activeCopyCount.textContent = !operations.length ? '' : activeTotal
@@ -2886,7 +2894,7 @@ function opRenderDestinations(jobs) {
 
 function opCell(job, file, outcome) {
     if (outcome) {
-        const kind = { copied: ['ok', 'check', 'Verificato'], skipped: ['ok', 'check', 'Già presente'], kept: ['warn', 'warn', 'Saltato'],
+        const kind = { copied: ['ok', 'check', 'Verificato'], skipped: ['ok', 'check', 'Copiato'], kept: ['warn', 'warn', 'Saltato'],
             warning: ['warn', 'warn', 'Da controllare'], failed: ['fail', 'fail', 'Non copiato'] }[outcome.status] || ['wait', 'ring', '—'];
         const span = opEl('span', `op-st ${kind[0]}`); span.append(opIcon(kind[1]), document.createTextNode(kind[2])); return span;
     }
@@ -2925,7 +2933,8 @@ function opRenderFiles(jobs, done) {
         const outcomes = jobs.map(job => opFileOutcomes.get(job.id)?.get(file));
         const bytes = outcomes.find(Boolean)?.bytes ?? jobs.map(job => latestProgress.get(job.id)).find(p => p?.currentFile === file)?.currentFileTotal;
         if (!outcomes.every(Boolean)) tr.className = 'op-current';
-        const name = opEl('td', 'op-file', file); name.title = file;
+        // The file name is what identifies a clip; the full path stays in the tooltip.
+        const name = opEl('td', 'op-file', opBase(file)); name.title = file;
         tr.append(name, opEl('td', 'op-size', bytes ? opSize(bytes) : ''));
         jobs.forEach((job, index) => { const td = opEl('td'); td.append(opCell(job, file, outcomes[index])); tr.append(td); });
         return tr;
@@ -2971,8 +2980,6 @@ function renderOperationGroup(focused) {
     const allDone = jobs.every(opFinished);
     const allOk = allDone && jobs.every(job => (job.result?.status || job.status) === 'completed');
     opMonitor.dataset.op = 'copy';
-    // The list of operations only adds information when other operations exist.
-    queueContainer?.classList.toggle('hidden', operations.every(op => opBatch(op) === opBatch(focused)));
     opMonitor.dataset.opState = allOk ? 'done' : allDone ? 'problem' : 'running';
     const n = jobs.length;
     const where = n === 1 ? opDisk(first.destDir).name : `${n} dischi`;

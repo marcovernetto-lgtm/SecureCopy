@@ -1,17 +1,17 @@
 {
-  "version": "2.10.1",
+  "version": "2.10.2",
   "build": 1,
   "releaseDate": "2026-11-06",
   "notes": {
-    "it": "Operazioni più leggibili: solo il nome dei file, Interrompi in evidenza, coda compatta con le sole copie in attesa. Corretto il pulsante Pausa che poteva sparire.",
-    "en": "Clearer Operations: file names only, a prominent Stop button, a compact queue with waiting copies only. Fixed the Pause button that could disappear."
+    "it": "Operazioni più essenziali: avanzamento solo nelle righe dei dischi, Riprova solo quando serve, Interrompi ferma tutti i dischi, un solo suono a fine operazione.",
+    "en": "Leaner Operations: progress only in the disk rows, Retry only when needed, Stop halts every disk, a single sound when the operation ends."
   },
   "downloads": {
-    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.1/SecureCopy-2.10.1-arm64.dmg",
-    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.1/SecureCopy-2.10.1-x64.dmg"
+    "arm64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.2/SecureCopy-2.10.2-arm64.dmg",
+    "x64": "https://github.com/marcovernetto-lgtm/SecureCopy/releases/download/v2.10.2/SecureCopy-2.10.2-x64.dmg"
   },
   "sha256": {
-    "arm64": "83c5429ca456886b3337b9bd8a6324c2d14e49175b3ef731b23268f0502e603e",
-    "x64": "ce0c100122b10b862c8e770effa72dc362e2e80680b290fa8aec4810e7605f18"
+    "arm64": "5094bb3b60d0084d1a4613d88087924eac707418a256e862bd7d0bfdddf4aa42",
+    "x64": "59d4f4c62947ad629baa5e11cb2876f55cba0adb0244adf9225e38e83008036f"
   }
 }

@@ -1,3 +1,11 @@
+## 2.10.2 — 6 novembre 2026
+
+- Operazioni: «Nuova copia» staccata dal titolo; tolte barra e percentuale generali, l'avanzamento resta nelle righe dei dischi con tempo rimanente e numero di file in alto.
+- «Riprova i file non copiati» compare solo a fine operazione e solo se qualcosa non è stato copiato; dopo un'interruzione diventa «Riprendi la copia».
+- «Interrompi» ferma l'intera operazione su tutti i dischi.
+- Una copia interrotta si chiama «Copia interrotta»; niente riepilogo che ripete il titolo.
+- Un solo suono, una volta per operazione (prima ne partivano due, uno per disco più un suono di sistema in caso di problemi); nessun suono se la copia è interrotta. Anche notifica Telegram ed espulsione automatica arrivano una volta sola, con i nomi dei dischi.
+
 ## 2.10.1 — 6 novembre 2026
 
 - Elenco dei file: solo il nome del file (il percorso completo resta nel suggerimento); i file già presenti e identici risultano «Copiato».

@@ -143,6 +143,7 @@
     'Verificato': 'Verified',
     'Copiato': 'Copied',
     'Coda': 'Queue',
+    'Riprendi la copia': 'Resume copy',
     'Saltato': 'Skipped',
     'Non copiato': 'Not copied',
     'In coda': 'Queued',

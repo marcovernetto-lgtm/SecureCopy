@@ -148,7 +148,7 @@ function displayResult(result, jobId = focusedJobId) {
     resultSummary.textContent = `${label} — ${result.copied || 0} copiati · ${result.skipped || 0} già validi${result.kept ? ` · ${result.kept} saltati per scelta` : ''} · ${result.failures?.length || 0} problemi`;
     resultSummary.dataset.status = result.status || 'failed';
     resultSummary.classList.remove('hidden');
-    document.getElementById('retry-copy-btn').classList.toggle('hidden', result.status === 'completed');
+    // Retry visibility for copies is decided per operation in renderOperationGroup.
     openReportBtn?.classList.toggle('hidden', !result.reportPath);
     document.getElementById('export-dit-report-btn')?.classList.toggle('hidden', !result.reportPath);
     openCopyDestinationBtn?.classList.toggle('hidden', !jobId);
@@ -421,7 +421,7 @@ function renderCopyProgress(data) {
         if (progressPercentage) progressPercentage.textContent = `${percentage}%`;
         if (progressDetails) progressDetails.textContent = data.phase === 'scan'
             ? `${data.filesFound || 0} file trovati`
-            : `${filesProcessed} di ${totalFiles} file esaminati`;
+            : `${filesProcessed} di ${totalFiles} file`;
         currentFilePanel.classList.remove('hidden');
         currentFileTrack.classList.remove('hidden');
         currentFileLabel.textContent = 'File in corso';
@@ -1087,7 +1087,14 @@ if (cancelBtn) {
         document.body.appendChild(confirmDialog);
 
         document.getElementById('confirm-cancel').onclick = () => {
-            window.electronAPI.cancelCopy(focusedJobId);
+            // Interrompi stops the whole operation: every destination copied together.
+            const focused = operations.find(item => item.id === focusedJobId);
+            const jobs = focused && focused.kind !== 'compare' ? opJobs(focused) : [];
+            if (!jobs.length) window.electronAPI.cancelCopy(focusedJobId);
+            for (const job of jobs) {
+                if (job.status === 'pending') window.electronAPI.removeFromQueue(job.id);
+                else if (!opFinished(job)) window.electronAPI.cancelCopy(job.id);
+            }
             document.body.removeChild(confirmDialog);
             // Keep the current state until the main process confirms cancellation.
         };
@@ -1164,6 +1171,7 @@ function resetProgressUI() {
     if (currentFileProgress) currentFileProgress.textContent = '0%';
     if (currentFileBar) { currentFileBar.style.transition = 'none'; currentFileBar.style.width = '0%'; }
     if (resultSummary) resultSummary.classList.add('hidden');
+    document.getElementById('retry-copy-btn')?.classList.add('hidden');
     failureDetails?.classList.add('hidden');
     openReportBtn?.classList.add('hidden');
     document.getElementById('export-dit-report-btn')?.classList.add('hidden');
@@ -2243,7 +2251,8 @@ function applyFileProgress(row, data) {
 }
 
 document.getElementById('retry-copy-btn').addEventListener('click', async () => {
-    try { focusedJobId = await window.electronAPI.retryCopy(focusedJobId); showMonitorScreen(); }
+    const target = document.getElementById('retry-copy-btn').dataset.jobId || focusedJobId;
+    try { focusedJobId = await window.electronAPI.retryCopy(target); showMonitorScreen(); }
     catch (error) { showError(error.message); }
 });
 
@@ -2992,8 +3001,11 @@ function renderOperationGroup(focused) {
         opRouteMeta.textContent = [opSourceLabel(first), totalBytes ? opSize(totalBytes) : '', Number.isFinite(started) && Number.isFinite(ended) ? opDuration(ended - started) : '']
             .filter(Boolean).join(' · ');
     } else if (allDone) {
-        const problems = jobs.reduce((sum, job) => sum + (job.result?.failures?.length || 0), 0);
-        opTitle.textContent = problems ? `${problems} ${problems === 1 ? 'elemento da controllare' : 'elementi da controllare'}` : 'Copia interrotta';
+        // A copy the user stopped is not a list of problems.
+        const stopped = jobs.some(job => (job.result?.status || job.status) === 'cancelled');
+        const problems = jobs.reduce((sum, job) => sum + (job.result?.failures || []).filter(failure => failure.path).length, 0);
+        opTitle.textContent = stopped ? 'Copia interrotta'
+            : `${problems || 1} ${problems === 1 ? 'elemento da controllare' : 'elementi da controllare'}`;
         opRouteMeta.textContent = `${opSourceLabel(first)} → ${where}`;
     } else {
         opTitle.textContent = `${opSourceLabel(first)} → ${where}`;
@@ -3013,6 +3025,17 @@ function renderOperationGroup(focused) {
     opRenderEta(allDone ? null : opEtaMs(jobs));
     opRenderDestinations(jobs);
 
+    // Retry appears only once the operation has ended with files left to copy.
+    const retryBtn = document.getElementById('retry-copy-btn');
+    const needsRetry = allDone && jobs.find(job => (job.result?.status || job.status) !== 'completed' && job.result);
+    retryBtn.classList.toggle('hidden', !needsRetry);
+    if (needsRetry) retryBtn.textContent = (needsRetry.result?.status || needsRetry.status) === 'cancelled' ? 'Riprendi la copia' : 'Riprova i file non copiati';
+    // The header already states the outcome; the summary line would repeat it.
+    resultSummary.classList.add('hidden');
+    // A stop requested by the user is not an item to review.
+    const realFailures = jobs.flatMap(job => job.result?.failures || []).filter(failure => failure.path);
+    if (allDone && !realFailures.length) failureDetails?.classList.add('hidden');
+    if (needsRetry) retryBtn.dataset.jobId = needsRetry.id; else delete retryBtn.dataset.jobId;
     opProof.hidden = !allOk;
     if (allOk) opRenderProof(jobs, focused);
     const volume = opSourceVolume(first);

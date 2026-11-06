@@ -668,34 +668,35 @@ async function finishJob(item, report) {
   send('copy-finished', { ...item.result, id: item.id, description: item.description });
   sendLog(report.status === 'completed' ? 'COMPLETE' : 'WARNING',
     `${item.description}: ${report.status}, ${item.filesCopied} copiati, ${item.filesSkipped} già validi, ${item.filesFailed} problemi.`);
-  if (mediaSettings.soundAlerts !== false) {
-    if (report.status === 'completed' && (!report.failures || !report.failures.length)) {
-      send('play-completion-sound', 'Assets/SOUND.mp3');
-    } else if (process.platform === 'darwin') {
-      require('child_process').execFile('/usr/bin/afplay', ['/System/Library/Sounds/Sosumi.aiff'], () => {});
-    }
-  }
-  if (mediaSettings.autoEject === true && report.status === 'completed' && (!report.failures || !report.failures.length) && process.platform === 'darwin') {
-    for (const src of (item.sourceDirs || [])) {
-      if (typeof src === 'string' && src.startsWith('/Volumes/')) {
-        const mountPoint = src.split(path.sep).slice(0, 3).join(path.sep);
-        require('child_process').execFile('/usr/sbin/diskutil', ['eject', mountPoint], () => {
-          sendLog('INFO', `Supporto ${path.basename(mountPoint)} espulso in sicurezza.`);
+  // Copies started together are one operation: notify once, when the last
+  // destination finishes, with the outcome of all of them.
+  const batchStillRunning = item.batchId && [...activeJobs.values()].map(job => job.item).concat(copyQueue)
+    .some(other => other.batchId === item.batchId);
+  if (!batchStillRunning) {
+    const batchItems = item.batchId ? completedJobs.filter(other => other.batchId === item.batchId) : [item];
+    const batchReport = { ...report,
+      status: batchItems.every(other => other.status === 'completed') ? 'completed' : 'partial',
+      failures: batchItems.flatMap(other => other.result?.failures || []) };
+    const allOk = batchReport.status === 'completed' && !batchReport.failures.length;
+    // One sound, once per operation; none when the user stopped it.
+    const userStopped = batchItems.every(other => other.status === 'cancelled');
+    if (mediaSettings.soundAlerts !== false && !userStopped) send('play-completion-sound', 'Assets/SOUND.mp3');
+    if (mediaSettings.autoEject === true && allOk && process.platform === 'darwin') {
+      const mounts = new Set((item.sourceDirs || []).filter(src => typeof src === 'string' && src.startsWith('/Volumes/'))
+        .map(src => src.split(path.sep).slice(0, 3).join(path.sep)));
+      for (const mountPoint of mounts) {
+        require('child_process').execFile('/usr/sbin/diskutil', ['eject', mountPoint], error => {
+          if (!error) sendLog('INFO', `Supporto ${path.basename(mountPoint)} espulso in sicurezza.`);
         });
       }
     }
-  }
-  if (mediaSettings.telegramEnabled && mediaSettings.telegramBotToken && mediaSettings.telegramChatId) {
-    const text = formatCopyCompletionMessage(item, report);
-    sendTelegramMessage(mediaSettings.telegramBotToken, mediaSettings.telegramChatId, text).then(res => {
-      if (res && res.ok) {
-        sendLog('INFO', 'Notifica Telegram inviata con successo.');
-      } else {
-        sendLog('WARNING', `Notifica Telegram non riuscita: ${res?.error || 'errore sconosciuto'}`);
-      }
-    }).catch(err => {
-      sendLog('WARNING', `Notifica Telegram fallita: ${err.message}`);
-    });
+    if (mediaSettings.telegramEnabled && mediaSettings.telegramBotToken && mediaSettings.telegramChatId) {
+      const text = formatCopyCompletionMessage({ ...item, destinationDir: batchItems.map(other => path.basename(other.destDir)).join(', ') }, batchReport);
+      sendTelegramMessage(mediaSettings.telegramBotToken, mediaSettings.telegramChatId, text).then(res => {
+        if (res && res.ok) sendLog('INFO', 'Notifica Telegram inviata con successo.');
+        else sendLog('WARNING', `Notifica Telegram non riuscita: ${res?.error || 'errore sconosciuto'}`);
+      }).catch(err => sendLog('WARNING', `Notifica Telegram fallita: ${err.message}`));
+    }
   }
   updateQueue();
   scheduleQueue();

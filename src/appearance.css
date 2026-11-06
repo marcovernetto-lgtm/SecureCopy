@@ -1231,3 +1231,16 @@ input[type='checkbox'] { accent-color: var(--section-light); }
 .monitor-screen .queue-item .job-state { flex: none; padding: 0; background: none; border: 0; font-size: 12px; color: #7c8e92; }
 .monitor-screen .queue-item .queue-icon-button { width: 28px; height: 28px; border: 0; background: none; color: var(--muted); border-radius: 6px; }
 .monitor-screen .queue-item .queue-icon-button:hover:not(:disabled) { background: rgba(237, 243, 243, .07); color: var(--text); }
+
+/* Operazioni: the back link sits apart from the title; progress lives only in
+   the destination rows, the header keeps time remaining and file count. */
+.monitor-screen .op-heading-main { gap: 26px; }
+.monitor-screen .op-heading { margin-top: -6px; }
+.monitor-screen[data-op="copy"] .op-overall { display: none; }
+.monitor-screen[data-op="copy"] #progress-percentage { display: none; }
+.monitor-screen[data-op="copy"] .op-progress-line #progress-details::before { content: none; }
+.monitor-screen[data-op="copy"] .op-destinations { margin-top: 0; }
+.monitor-screen[data-op="copy"] .op-body { margin-top: 28px; }
+/* Back link set apart from the title (overrides the shared 3-row heading grid). */
+.monitor-screen .page-heading.op-heading > .op-heading-main { display: flex; flex-direction: column; row-gap: 0; }
+.monitor-screen .page-heading.op-heading .back-link { margin: 0 0 22px; }
